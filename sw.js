@@ -1,8 +1,8 @@
 const CACHE_NAME = 'drizzl-weather-v1';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  '/drizzl/',
+  '/drizzl/index.html',
+  '/drizzl/manifest.json'
 ];
 
 self.addEventListener('install', event => {
@@ -25,7 +25,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // Network-first for API calls, cache-first for static assets
-  if (url.hostname.includes('open-meteo.com')) {
+  if (url.hostname.includes('open-meteo.com') || url.hostname.includes('nominatim.openstreetmap.org')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {

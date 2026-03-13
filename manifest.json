@@ -2,7 +2,7 @@
   "name": "Drizzl Weather",
   "short_name": "Drizzl",
   "description": "A clean, ad-free weather PWA with multi-location support",
-  "start_url": "/",
+  "start_url": "/drizzl/",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
