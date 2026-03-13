@@ -57,11 +57,11 @@
 :root {
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
-  --bg-card: rgba(0,0,0,0.25);
-  --bg-card-hover: rgba(0,0,0,0.35);
+  --bg-card: rgba(0,0,0,0.4);
+  --bg-card-hover: rgba(0,0,0,0.5);
   --text-primary: #f0f0f0;
-  --text-secondary: rgba(240,240,240,0.65);
-  --text-dim: rgba(240,240,240,0.4);
+  --text-secondary: rgba(240,240,240,0.75);
+  --text-dim: rgba(240,240,240,0.5);
   --accent: #60a5fa;
   --accent-warm: #fbbf24;
   --accent-cool: #818cf8;
@@ -94,9 +94,10 @@ body {
 .atmos-dawn   { background: linear-gradient(170deg, #1e3a5f 0%, #d97706 40%, #fbbf24 100%); }
 .atmos-dusk   { background: linear-gradient(170deg, #4c1d95 0%, #dc2626 35%, #f59e0b 100%); }
 .atmos-overcast { background: linear-gradient(170deg, #475569 0%, #64748b 50%, #94a3b8 100%); }
+.atmos-overcast .card { --bg-card: rgba(0,0,0,0.45); }
 .atmos-rain   { background: linear-gradient(170deg, #1e293b 0%, #334155 50%, #475569 100%); }
 .atmos-snow   { background: linear-gradient(170deg, #cbd5e1 0%, #e2e8f0 50%, #f1f5f9 100%); }
-.atmos-snow .card { --bg-card: rgba(0,0,0,0.15); }
+.atmos-snow .card { --bg-card: rgba(0,0,0,0.3); }
 .atmos-snow { --text-primary: #1e293b; --text-secondary: rgba(30,41,59,0.65); --text-dim: rgba(30,41,59,0.4); }
 
 /* ── App shell ── */
@@ -145,7 +146,7 @@ body {
 .search-box input {
   flex: 1; padding: 12px 16px; border-radius: var(--radius-sm);
   border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.1); color: var(--text-primary);
+  background: rgba(255,255,255,0.15); color: var(--text-primary);
   font-family: var(--font-body); font-size: 1rem;
   outline: none;
 }
@@ -165,7 +166,7 @@ body {
   cursor: pointer; display: flex; align-items: center; gap: 10px;
   transition: background 0.15s;
 }
-.search-results li:hover, .fav-list li:hover { background: rgba(255,255,255,0.1); }
+.search-results li:hover, .fav-list li:hover { background: rgba(255,255,255,0.15); }
 .fav-list li .fav-name { flex: 1; }
 .fav-list li .fav-remove {
   opacity: 0.4; cursor: pointer; font-size: 1.1rem; padding: 4px;
@@ -183,8 +184,9 @@ body {
   border-radius: var(--radius);
   padding: 20px;
   margin-bottom: 14px;
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 .card-title {
   font-family: var(--font-display);
@@ -219,7 +221,7 @@ body {
   font-size: 0.85rem; color: var(--text-secondary);
 }
 .current-details span {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.15);
   padding: 6px 12px; border-radius: 20px;
 }
 .current-desc {
@@ -238,10 +240,10 @@ body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 12px; border-radius: var(--radius-sm);
   font-size: 0.8rem; min-width: 64px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.12);
   transition: background 0.15s;
 }
-.hour-chip.now { background: rgba(96,165,250,0.2); }
+.hour-chip.now { background: rgba(96,165,250,0.3); }
 .hour-chip .h-time { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; }
 .hour-chip .h-icon { font-size: 1.3rem; }
 .hour-chip .h-temp { font-weight: 600; font-size: 0.9rem; }
@@ -251,7 +253,7 @@ body {
 .daily-row {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
 }
 .daily-row:last-child { border-bottom: none; }
 .daily-day { width: 42px; font-size: 0.85rem; font-weight: 500; }
@@ -262,7 +264,7 @@ body {
 .daily-hi { font-size: 0.8rem; font-weight: 600; width: 32px; }
 .daily-bar {
   flex: 1; height: 5px; border-radius: 3px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.12);
   position: relative; overflow: hidden;
 }
 .daily-bar-fill {
@@ -277,7 +279,7 @@ body {
 .sm-item {
   display: flex; align-items: center; gap: 10px;
   padding: 10px; border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.12);
 }
 .sm-icon { font-size: 1.3rem; }
 .sm-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -286,7 +288,7 @@ body {
   grid-column: 1 / -1;
   display: flex; align-items: center; gap: 16px;
   padding: 12px; border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.12);
 }
 .moon-disc {
   width: 48px; height: 48px; border-radius: 50%;
