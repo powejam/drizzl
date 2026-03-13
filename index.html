@@ -17,8 +17,8 @@
 :root {
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
-  --bg-card: rgba(255,255,255,0.08);
-  --bg-card-hover: rgba(255,255,255,0.12);
+  --bg-card: rgba(0,0,0,0.25);
+  --bg-card-hover: rgba(0,0,0,0.35);
   --text-primary: #f0f0f0;
   --text-secondary: rgba(240,240,240,0.65);
   --text-dim: rgba(240,240,240,0.4);
@@ -56,7 +56,7 @@ body {
 .atmos-overcast { background: linear-gradient(170deg, #475569 0%, #64748b 50%, #94a3b8 100%); }
 .atmos-rain   { background: linear-gradient(170deg, #1e293b 0%, #334155 50%, #475569 100%); }
 .atmos-snow   { background: linear-gradient(170deg, #cbd5e1 0%, #e2e8f0 50%, #f1f5f9 100%); }
-.atmos-snow .card { --bg-card: rgba(0,0,0,0.1); }
+.atmos-snow .card { --bg-card: rgba(0,0,0,0.15); }
 .atmos-snow { --text-primary: #1e293b; --text-secondary: rgba(30,41,59,0.65); --text-dim: rgba(30,41,59,0.4); }
 
 /* ── App shell ── */
@@ -143,8 +143,8 @@ body {
   border-radius: var(--radius);
   padding: 20px;
   margin-bottom: 14px;
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 .card-title {
   font-family: var(--font-display);
@@ -179,7 +179,7 @@ body {
   font-size: 0.85rem; color: var(--text-secondary);
 }
 .current-details span {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.1);
   padding: 6px 12px; border-radius: 20px;
 }
 .current-desc {
@@ -198,7 +198,7 @@ body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 12px; border-radius: var(--radius-sm);
   font-size: 0.8rem; min-width: 64px;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.08);
   transition: background 0.15s;
 }
 .hour-chip.now { background: rgba(96,165,250,0.2); }
@@ -211,7 +211,7 @@ body {
 .daily-row {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 .daily-row:last-child { border-bottom: none; }
 .daily-day { width: 42px; font-size: 0.85rem; font-weight: 500; }
@@ -237,7 +237,7 @@ body {
 .sm-item {
   display: flex; align-items: center; gap: 10px;
   padding: 10px; border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.08);
 }
 .sm-icon { font-size: 1.3rem; }
 .sm-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -246,7 +246,7 @@ body {
   grid-column: 1 / -1;
   display: flex; align-items: center; gap: 16px;
   padding: 12px; border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.08);
 }
 .moon-disc {
   width: 48px; height: 48px; border-radius: 50%;
@@ -423,7 +423,9 @@ function julianDay(date) {
 
 function sunTimes(date, lat, lon) {
   const rad = Math.PI / 180;
-  const jd = julianDay(date);
+  // Normalize to noon UTC — the algorithm requires this as the starting point
+  const noon = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
+  const jd = julianDay(noon);
   const n = jd - 2451545.0 + 0.0008;
   const Js = n - lon / 360;
   const M = (357.5291 + 0.98560028 * Js) % 360;
@@ -487,9 +489,11 @@ function windDir(deg) {
 
 // ── Format helpers ──
 function fmt(n, d=0) { return n != null ? n.toFixed(d) : '—'; }
-function fmtTime(date) {
+function fmtTime(date, tz) {
   if (!date) return '—';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const opts = { hour: '2-digit', minute: '2-digit', hour12: false };
+  if (tz) opts.timeZone = tz;
+  return date.toLocaleTimeString([], opts);
 }
 
 // ── Atmosphere background ──
@@ -704,24 +708,32 @@ function render(weather, location) {
   </div>`;
 
   // ── Sun & Moon ──
+  // Use API sunrise/sunset (more accurate), calculated dawn/dusk
+  // All times displayed in the location's timezone
+  const tz = weather.timezone;
+  const apiSunrise = daily.sunrise ? fmtTime(new Date(daily.sunrise[0]), tz) : (times.sun ? fmtTime(times.sun.rise, tz) : '—');
+  const apiSunset  = daily.sunset  ? fmtTime(new Date(daily.sunset[0]), tz)  : (times.sun ? fmtTime(times.sun.set, tz)  : '—');
+  const dawn = times.civil ? fmtTime(times.civil.rise, tz) : '—';
+  const dusk = times.civil ? fmtTime(times.civil.set, tz) : '—';
+
   html += `<div class="card">
     <div class="card-title">Sun & Moon</div>
     <div class="sun-moon-grid">
       <div class="sm-item">
         <span class="sm-icon">🌅</span>
-        <div><div class="sm-label">Dawn</div><div class="sm-value">${times.civil ? fmtTime(times.civil.rise) : '—'}</div></div>
+        <div><div class="sm-label">Dawn</div><div class="sm-value">${dawn}</div></div>
       </div>
       <div class="sm-item">
         <span class="sm-icon">☀️</span>
-        <div><div class="sm-label">Sunrise</div><div class="sm-value">${times.sun ? fmtTime(times.sun.rise) : '—'}</div></div>
+        <div><div class="sm-label">Sunrise</div><div class="sm-value">${apiSunrise}</div></div>
       </div>
       <div class="sm-item">
         <span class="sm-icon">🌇</span>
-        <div><div class="sm-label">Sunset</div><div class="sm-value">${times.sun ? fmtTime(times.sun.set) : '—'}</div></div>
+        <div><div class="sm-label">Sunset</div><div class="sm-value">${apiSunset}</div></div>
       </div>
       <div class="sm-item">
         <span class="sm-icon">🌆</span>
-        <div><div class="sm-label">Dusk</div><div class="sm-value">${times.civil ? fmtTime(times.civil.set) : '—'}</div></div>
+        <div><div class="sm-label">Dusk</div><div class="sm-value">${dusk}</div></div>
       </div>
       <div class="moon-phase-visual">
         ${renderMoonDisc(moon)}
