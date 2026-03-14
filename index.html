@@ -272,30 +272,44 @@ body {
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
 }
 
-/* ── Sun & Moon ── */
-.sun-moon-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+/* ── Daylight graph ── */
+.daylight-graph {
+  position: relative;
+  width: 100%;
+  padding: 0 0 8px;
 }
-.sm-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px; border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.12);
+.daylight-graph svg {
+  width: 100%; height: auto;
+  display: block;
 }
-.sm-icon { font-size: 1.3rem; }
-.sm-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-.sm-value { font-size: 0.95rem; font-weight: 500; }
-.moon-phase-visual {
-  grid-column: 1 / -1;
-  display: flex; align-items: center; gap: 16px;
-  padding: 12px; border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.12);
+.daylight-labels {
+  display: flex; justify-content: space-between;
+  padding: 8px 4px 0;
+  font-size: 0.7rem; color: var(--text-secondary);
+}
+.daylight-labels .dl-item { text-align: center; }
+.daylight-labels .dl-time {
+  font-size: 0.85rem; font-weight: 500; color: var(--text-primary);
+  margin-top: 2px;
+}
+.daylight-summary {
+  display: flex; justify-content: center; gap: 24px;
+  padding-top: 14px; margin-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.8rem; color: var(--text-secondary);
+}
+.daylight-summary span { font-weight: 500; color: var(--text-primary); }
+.moon-row {
+  display: flex; align-items: center; gap: 14px;
+  padding-top: 14px; margin-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.1);
 }
 .moon-disc {
-  width: 48px; height: 48px; border-radius: 50%;
+  width: 40px; height: 40px; border-radius: 50%;
   position: relative; overflow: hidden;
   background: #e8e8d0;
   flex-shrink: 0;
-  box-shadow: 0 0 12px rgba(255,255,200,0.2);
+  box-shadow: 0 0 10px rgba(255,255,200,0.15);
 }
 .moon-shadow {
   position: absolute; top: 0; height: 100%;
@@ -303,8 +317,8 @@ body {
   transition: all 0.3s;
 }
 .moon-info { flex: 1; }
-.moon-name { font-size: 0.95rem; font-weight: 500; }
-.moon-illum { font-size: 0.8rem; color: var(--text-secondary); }
+.moon-name { font-size: 0.9rem; font-weight: 500; }
+.moon-illum { font-size: 0.75rem; color: var(--text-secondary); }
 
 /* ── Wind details ── */
 .wind-details {
@@ -796,40 +810,43 @@ function render(weather, location) {
     </div>
   </div>`;
 
-  // ── Sun & Moon ──
-  // Use API sunrise/sunset (more accurate), calculated dawn/dusk
-  // All times displayed in the location's timezone
+  // ── Daylight Graph ──
   const tz = weather.timezone;
-  const apiSunrise = daily.sunrise ? fmtTime(new Date(daily.sunrise[0]), tz) : (times.sun ? fmtTime(times.sun.rise, tz) : '—');
-  const apiSunset  = daily.sunset  ? fmtTime(new Date(daily.sunset[0]), tz)  : (times.sun ? fmtTime(times.sun.set, tz)  : '—');
-  const dawn = times.civil ? fmtTime(times.civil.rise, tz) : '—';
-  const dusk = times.civil ? fmtTime(times.civil.set, tz) : '—';
+
+  // Get actual Date objects for the key sun events
+  const sunriseDate = daily.sunrise ? new Date(daily.sunrise[0]) : (times.sun ? times.sun.rise : null);
+  const sunsetDate  = daily.sunset  ? new Date(daily.sunset[0])  : (times.sun ? times.sun.set  : null);
+  const dawnDate = times.civil ? times.civil.rise : null;
+  const duskDate = times.civil ? times.civil.set  : null;
+
+  // Format labels
+  const apiSunrise = sunriseDate ? fmtTime(sunriseDate, tz) : '—';
+  const apiSunset  = sunsetDate  ? fmtTime(sunsetDate, tz)  : '—';
+  const dawnLabel  = dawnDate    ? fmtTime(dawnDate, tz)     : '—';
+  const duskLabel  = duskDate    ? fmtTime(duskDate, tz)     : '—';
 
   html += `<div class="card">
-    <div class="card-title">Sun & Moon</div>
-    <div class="sun-moon-grid">
-      <div class="sm-item">
-        <span class="sm-icon">🌅</span>
-        <div><div class="sm-label">Dawn</div><div class="sm-value">${dawn}</div></div>
-      </div>
-      <div class="sm-item">
-        <span class="sm-icon">☀️</span>
-        <div><div class="sm-label">Sunrise</div><div class="sm-value">${apiSunrise}</div></div>
-      </div>
-      <div class="sm-item">
-        <span class="sm-icon">🌇</span>
-        <div><div class="sm-label">Sunset</div><div class="sm-value">${apiSunset}</div></div>
-      </div>
-      <div class="sm-item">
-        <span class="sm-icon">🌆</span>
-        <div><div class="sm-label">Dusk</div><div class="sm-value">${dusk}</div></div>
-      </div>
-      <div class="moon-phase-visual">
-        ${renderMoonDisc(moon)}
-        <div class="moon-info">
-          <div class="moon-name">${moon.name}</div>
-          <div class="moon-illum">${(moon.illumination * 100).toFixed(0)}% illuminated</div>
-        </div>
+    <div class="card-title">Daylight</div>
+    ${renderDaylightArc(dawnDate, sunriseDate, sunsetDate, duskDate, now)}
+    <div class="daylight-labels">
+      <div class="dl-item"><div>Dawn</div><div class="dl-time">${dawnLabel}</div></div>
+      <div class="dl-item"><div>Sunrise</div><div class="dl-time">${apiSunrise}</div></div>
+      <div class="dl-item"><div>Sunset</div><div class="dl-time">${apiSunset}</div></div>
+      <div class="dl-item"><div>Dusk</div><div class="dl-time">${duskLabel}</div></div>
+    </div>
+    ${sunriseDate && sunsetDate ? (() => {
+      const daylightMs = sunsetDate - sunriseDate;
+      const daylightH = Math.floor(daylightMs / 3600000);
+      const daylightM = Math.floor((daylightMs % 3600000) / 60000);
+      return `<div class="daylight-summary">
+        <div>Daylight <span>${daylightH}h ${daylightM}m</span></div>
+      </div>`;
+    })() : ''}
+    <div class="moon-row">
+      ${renderMoonDisc(moon)}
+      <div class="moon-info">
+        <div class="moon-name">${moon.name}</div>
+        <div class="moon-illum">${(moon.illumination * 100).toFixed(0)}% illuminated</div>
       </div>
     </div>
   </div>`;
@@ -839,6 +856,149 @@ function render(weather, location) {
   html += `</div>`;
 
   main.innerHTML = html;
+}
+
+function renderDaylightArc(dawn, sunrise, sunset, dusk, now) {
+  if (!dawn || !sunrise || !sunset || !dusk) {
+    return '<div style="text-align:center;color:var(--text-dim);padding:20px;">Sun data unavailable</div>';
+  }
+
+  // SVG dimensions
+  const W = 400, H = 155;
+  const horizonY = 128;
+  const cx = W / 2, rx = 168, ry = 105;
+  const padL = cx - rx, padR = cx + rx;
+
+  // Map time to 0..1 proportion across dawn→dusk span
+  const dawnMs = dawn.getTime();
+  const duskMs = dusk.getTime();
+  const totalSpan = duskMs - dawnMs;
+
+  function timeFrac(d) {
+    return Math.max(0, Math.min(1, (d.getTime() - dawnMs) / totalSpan));
+  }
+
+  // Position on elliptical arc for fraction t (0=dawn/left, 1=dusk/right)
+  function arcPos(t) {
+    const angle = Math.PI * (1 - t);
+    return {
+      x: cx + rx * Math.cos(angle),
+      y: horizonY - ry * Math.sin(angle)
+    };
+  }
+
+  const fDawn    = 0;
+  const fSunrise = timeFrac(sunrise);
+  const fSunset  = timeFrac(sunset);
+  const fDusk    = 1;
+  const fNow     = timeFrac(now);
+
+  const pDawn    = arcPos(fDawn);
+  const pSunrise = arcPos(fSunrise);
+  const pSunset  = arcPos(fSunset);
+  const pDusk    = arcPos(fDusk);
+
+  // Is the sun currently up?
+  const nowMs = now.getTime();
+  const sunIsUp = nowMs >= dawnMs && nowMs <= duskMs;
+  const isDaytime = nowMs >= sunrise.getTime() && nowMs <= sunset.getTime();
+  const pNow = sunIsUp ? arcPos(fNow) : null;
+
+  // Build arc path segments using many small line segments for smooth curve
+  function arcPathBetween(t0, t1, steps = 40) {
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = t0 + (t1 - t0) * (i / steps);
+      const p = arcPos(t);
+      pts.push(`${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`);
+    }
+    return pts.join(' ');
+  }
+
+  // Twilight arcs (dawn→sunrise, sunset→dusk)
+  const twilightPath1 = arcPathBetween(fDawn, fSunrise);
+  const twilightPath2 = arcPathBetween(fSunset, fDusk);
+  // Daylight arc (sunrise→sunset)
+  const daylightPath = arcPathBetween(fSunrise, fSunset);
+  // Full arc for the faint background
+  const fullArcPath = arcPathBetween(0, 1, 60);
+
+  // Filled area under daylight arc
+  const daylightFillPts = [];
+  for (let i = 0; i <= 50; i++) {
+    const t = fSunrise + (fSunset - fSunrise) * (i / 50);
+    const p = arcPos(t);
+    daylightFillPts.push(`${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`);
+  }
+  daylightFillPts.push(`L${arcPos(fSunset).x.toFixed(1)},${horizonY}`);
+  daylightFillPts.push(`L${arcPos(fSunrise).x.toFixed(1)},${horizonY} Z`);
+  const daylightFillPath = daylightFillPts.join(' ');
+
+  // Sun glow gradient
+  const sunGlow = pNow ? `
+    <defs>
+      <radialGradient id="sunGlow">
+        <stop offset="0%" stop-color="${isDaytime ? '#fbbf24' : '#f59e0b'}" stop-opacity="0.6"/>
+        <stop offset="100%" stop-color="${isDaytime ? '#fbbf24' : '#f59e0b'}" stop-opacity="0"/>
+      </radialGradient>
+    </defs>` : '';
+
+  // Marker dots
+  function marker(p, color, r = 3.5) {
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r}" fill="${color}" />`;
+  }
+
+  // Night indicator if sun is below horizon
+  let belowHorizonIndicator = '';
+  if (!sunIsUp) {
+    // Show a small moon/dot below the horizon
+    const nightFrac = nowMs < dawnMs
+      ? 0.15  // before dawn, show on left
+      : 0.85; // after dusk, show on right
+    const nx = padL + (padR - padL) * nightFrac;
+    belowHorizonIndicator = `
+      <circle cx="${nx.toFixed(1)}" cy="${horizonY + 14}" r="4" fill="#94a3b8" opacity="0.6" />
+      <text x="${nx.toFixed(1)}" cy="${horizonY + 14}" text-anchor="middle" dy="-10" fill="#94a3b8" font-size="10" font-family="var(--font-body)">now</text>`;
+  }
+
+  return `<div class="daylight-graph"><svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    ${sunGlow}
+
+    <!-- Daylight fill area -->
+    <path d="${daylightFillPath}" fill="rgba(250,204,21,0.08)" />
+
+    <!-- Horizon line -->
+    <line x1="${padL}" y1="${horizonY}" x2="${padR}" y2="${horizonY}" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
+
+    <!-- Full arc background -->
+    <path d="${fullArcPath}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
+
+    <!-- Twilight arcs -->
+    <path d="${twilightPath1}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0.5" />
+    <path d="${twilightPath2}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0.5" />
+
+    <!-- Daylight arc -->
+    <path d="${daylightPath}" fill="none" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Marker dots -->
+    ${marker(pDawn, '#f59e0b', 4)}
+    ${marker(pSunrise, '#fbbf24', 5)}
+    ${marker(pSunset, '#fbbf24', 5)}
+    ${marker(pDusk, '#f59e0b', 4)}
+
+    <!-- Current sun position -->
+    ${pNow ? `
+      <circle cx="${pNow.x.toFixed(1)}" cy="${pNow.y.toFixed(1)}" r="16" fill="url(#sunGlow)" />
+      <circle cx="${pNow.x.toFixed(1)}" cy="${pNow.y.toFixed(1)}" r="7" fill="${isDaytime ? '#fbbf24' : '#f59e0b'}" />
+      <circle cx="${pNow.x.toFixed(1)}" cy="${pNow.y.toFixed(1)}" r="4.5" fill="${isDaytime ? '#fef3c7' : '#fde68a'}" />
+    ` : ''}
+
+    ${belowHorizonIndicator}
+
+    <!-- Horizon labels -->
+    <text x="${padL}" y="${horizonY + 16}" fill="rgba(255,255,255,0.3)" font-size="9" font-family="var(--font-body)" text-anchor="middle">night</text>
+    <text x="${padR}" y="${horizonY + 16}" fill="rgba(255,255,255,0.3)" font-size="9" font-family="var(--font-body)" text-anchor="middle">night</text>
+  </svg></div>`;
 }
 
 function renderMoonDisc(moon) {
