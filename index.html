@@ -248,6 +248,7 @@ body {
 .hour-chip .h-icon { font-size: 1.3rem; }
 .hour-chip .h-temp { font-weight: 600; font-size: 0.9rem; }
 .hour-chip .h-precip { font-size: 0.7rem; color: #93c5fd; }
+.hour-chip .h-wind { font-size: 0.65rem; color: var(--text-secondary); white-space: nowrap; }
 
 /* ── Daily forecast ── */
 .daily-row {
@@ -259,6 +260,7 @@ body {
 .daily-day { width: 42px; font-size: 0.85rem; font-weight: 500; }
 .daily-icon { font-size: 1.3rem; width: 32px; text-align: center; }
 .daily-precip { font-size: 0.75rem; color: #93c5fd; width: 36px; text-align: right; }
+.daily-wind { font-size: 0.7rem; color: var(--text-secondary); width: 52px; text-align: right; white-space: nowrap; }
 .daily-bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
 .daily-lo { font-size: 0.8rem; color: var(--text-dim); width: 32px; text-align: right; }
 .daily-hi { font-size: 0.8rem; font-weight: 600; width: 32px; }
@@ -577,8 +579,8 @@ async function fetchWeather(lat, lon) {
     latitude: lat,
     longitude: lon,
     current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,cloud_cover',
-    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,is_day',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max',
+    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max',
     timezone: 'auto',
     forecast_days: 10,
   });
@@ -709,12 +711,15 @@ function render(weather, location) {
       const icon = wmoIcon(weather.hourly.weather_code[i], weather.hourly.is_day[i] === 0);
       const temp = fmt(weather.hourly.temperature_2m[i], 0);
       const precip = weather.hourly.precipitation_probability[i];
+      const windSpd = fmt(weather.hourly.wind_speed_10m[i], 0);
+      const windD = windDir(weather.hourly.wind_direction_10m[i]);
       const isNowCls = (i === fromIdx && firstIsNow) ? ' now' : '';
       chips += `<div class="hour-chip${isNowCls}">
         <span class="h-time">${label}</span>
         <span class="h-icon">${icon}</span>
         <span class="h-temp">${temp}°</span>
         <span class="h-precip">${fmt(precip, 0)}%</span>
+        <span class="h-wind">💨${windSpd} ${windD}</span>
       </div>`;
     }
     return chips;
@@ -752,10 +757,13 @@ function render(weather, location) {
     const left = ((lo - allMin) / range) * 100;
     const width = ((hi - lo) / range) * 100;
     const precip = daily.precipitation_probability_max[i];
+    const dWindSpd = fmt(daily.wind_speed_10m_max[i], 0);
+    const dWindD = windDir(daily.wind_direction_10m_dominant[i]);
     html += `<div class="daily-row">
       <span class="daily-day">${dayLabel}</span>
       <span class="daily-icon">${wmoDailyIcon(daily.weather_code[i])}</span>
       <span class="daily-precip">${fmt(precip, 0)}%</span>
+      <span class="daily-wind">💨${dWindSpd} ${dWindD}</span>
       <div class="daily-bar-wrap">
         <span class="daily-lo">${fmt(lo,0)}°</span>
         <div class="daily-bar"><div class="daily-bar-fill" style="left:${left}%;width:${Math.max(width,4)}%"></div></div>
