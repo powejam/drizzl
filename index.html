@@ -869,39 +869,19 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
 
   function tx(ms) { return graphL + ((ms - t0) / span) * graphW; }
 
-  // Curve: flat-topped plateau — steep rise at dawn/sunrise, flat across daytime, steep fall at sunset/dusk
-  // Uses smoothstep transitions for natural-looking edges
+  // Curve: wide smooth dome — steeper at edges, gently curved across the top
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
-
-  function smoothstep(t) {
-    t = Math.max(0, Math.min(1, t));
-    return t * t * (3 - 2 * t);
-  }
 
   function curveY(ms) {
     if (ms <= dawnMs) return horizonY + twilightDepth;
     if (ms >= duskMs) return horizonY + twilightDepth;
 
-    // Rising edge: dawn → sunrise (below horizon → plateau)
-    if (ms < sunriseMs) {
-      const t = (ms - dawnMs) / (sunriseMs - dawnMs);
-      const h = smoothstep(t);
-      // Goes from twilightDepth below horizon to full plateau height
-      return horizonY + twilightDepth - h * (horizonY + twilightDepth - peakY);
-    }
-
-    // Falling edge: sunset → dusk (plateau → below horizon)
-    if (ms > sunsetMs) {
-      const t = (ms - sunsetMs) / (duskMs - sunsetMs);
-      const h = 1 - smoothstep(t);
-      return horizonY + twilightDepth - h * (horizonY + twilightDepth - peakY);
-    }
-
-    // Flat plateau with gentle dome: sunrise → sunset
-    // Slight dome so it's not ruler-flat (looks more natural)
-    const f = (ms - sunriseMs) / (sunsetMs - sunriseMs);
-    const dome = Math.sin(f * Math.PI) * 0.08;
-    return peakY - dome * (horizonY - peakY);
+    // Normalise 0..1 within dawn..dusk
+    const f = (ms - dawnMs) / (duskMs - dawnMs);
+    // Power-adjusted sine: sin^0.6 gives a wider dome than sin^1 (pure sine)
+    // but still has a smooth curve, not a flat top
+    const h = Math.pow(Math.sin(f * Math.PI), 0.6);
+    return horizonY - h * (horizonY - peakY);
   }
 
   // Build the main curve path (including night extensions)
