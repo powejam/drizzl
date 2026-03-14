@@ -869,18 +869,16 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
 
   function tx(ms) { return graphL + ((ms - t0) / span) * graphW; }
 
-  // Curve: wide smooth dome — steeper at edges, gently curved across the top
+  // Curve: Gaussian bell curve (normal distribution shape)
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
 
   function curveY(ms) {
     if (ms <= dawnMs) return horizonY + twilightDepth;
     if (ms >= duskMs) return horizonY + twilightDepth;
 
-    // Normalise 0..1 within dawn..dusk
-    const f = (ms - dawnMs) / (duskMs - dawnMs);
-    // Power-adjusted sine: sin^0.6 gives a wider dome than sin^1 (pure sine)
-    // but still has a smooth curve, not a flat top
-    const h = Math.pow(Math.sin(f * Math.PI), 0.6);
+    const f = (ms - dawnMs) / (duskMs - dawnMs); // 0 to 1
+    const sigma = 0.22;
+    const h = Math.exp(-0.5 * Math.pow((f - 0.5) / sigma, 2));
     return horizonY - h * (horizonY - peakY);
   }
 
