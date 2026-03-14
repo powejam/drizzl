@@ -831,7 +831,7 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
     return '<div style="text-align:center;color:var(--text-dim);padding:20px;">Sun data unavailable</div>';
   }
 
-  const W = 400, H = 190;
+  const W = 400, H = 200;
   const margin = 16;
   const graphL = margin, graphR = W - margin, graphW = graphR - graphL;
   const topY = 28;       // pixel y for curve peak
@@ -929,13 +929,13 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
     </defs>
 
     ${inView(sunriseMs) ? `
-      <text x="${clampX(xSunrise).toFixed(1)}" y="12" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="11" font-family="var(--font-body)">Sunrise</text>
-      <text x="${clampX(xSunrise).toFixed(1)}" y="26" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="16" font-weight="600" font-family="var(--font-display)">${sunriseLabel}</text>
+      <text x="${clampX(xSunrise).toFixed(1)}" y="12" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="14" font-family="var(--font-body)">Sunrise</text>
+      <text x="${clampX(xSunrise).toFixed(1)}" y="26" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${sunriseLabel}</text>
     ` : ''}
 
     ${inView(sunsetMs) ? `
-      <text x="${clampX(xSunset).toFixed(1)}" y="12" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="11" font-family="var(--font-body)">Sunset</text>
-      <text x="${clampX(xSunset).toFixed(1)}" y="26" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="16" font-weight="600" font-family="var(--font-display)">${sunsetLabel}</text>
+      <text x="${clampX(xSunset).toFixed(1)}" y="12" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="14" font-family="var(--font-body)">Sunset</text>
+      <text x="${clampX(xSunset).toFixed(1)}" y="26" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${sunsetLabel}</text>
     ` : ''}
 
     ${dayFillPts.length > 0 ? `<path d="${dayFillPts.join(' ')}" fill="url(#dayFill)" />` : ''}
@@ -949,18 +949,18 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
     ${marker}
 
     ${inView(dawnMs) ? `
-      <text x="${clampX(xDawn).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="10.5" font-family="var(--font-body)">Dawn</text>
-      <text x="${clampX(xDawn).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14" font-weight="500" font-family="var(--font-display)">${dawnLabel}</text>
+      <text x="${clampX(xDawn).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="13" font-family="var(--font-body)">Dawn</text>
+      <text x="${clampX(xDawn).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="18" font-weight="500" font-family="var(--font-display)">${dawnLabel}</text>
     ` : ''}
 
     ${inView(solarNoonMs) ? `
-      <text x="${clampX(xNoon).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="10.5" font-family="var(--font-body)">Solar noon</text>
-      <text x="${clampX(xNoon).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14" font-weight="500" font-family="var(--font-display)">${noonLabel}</text>
+      <text x="${clampX(xNoon).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="13" font-family="var(--font-body)">Solar noon</text>
+      <text x="${clampX(xNoon).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="18" font-weight="500" font-family="var(--font-display)">${noonLabel}</text>
     ` : ''}
 
     ${inView(duskMs) ? `
-      <text x="${clampX(xDusk).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="10.5" font-family="var(--font-body)">Dusk</text>
-      <text x="${clampX(xDusk).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14" font-weight="500" font-family="var(--font-display)">${duskLabel}</text>
+      <text x="${clampX(xDusk).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="13" font-family="var(--font-body)">Dusk</text>
+      <text x="${clampX(xDusk).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="18" font-weight="500" font-family="var(--font-display)">${duskLabel}</text>
     ` : ''}
   </svg></div>`;
 }
