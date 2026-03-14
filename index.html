@@ -869,28 +869,55 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
 
   function tx(ms) { return graphL + ((ms - t0) / span) * graphW; }
 
-  // Curve: smooth bell from dawn to dusk
-  // Below horizon before dawn, rises through sunrise, peaks at solar noon, 
-  // descends through sunset, below horizon after dusk
-  // Dawn/dusk are at horizon, sunrise/sunset slightly above
+  // Curve: flat-topped plateau — steep rise at dawn/sunrise, flat across daytime, steep fall at sunset/dusk
+  // Uses smoothstep transitions for natural-looking edges
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
 
-  function curveY(ms) {
-    if (ms <= dawnMs || ms >= duskMs) return horizonY + twilightDepth;
-    // Normalise 0..1 within dawn..dusk
-    const f = (ms - dawnMs) / (duskMs - dawnMs);
-    // Sine curve: 0 at edges, 1 at center
-    const h = Math.sin(f * Math.PI);
-    return horizonY - h * (horizonY - peakY);
+  function smoothstep(t) {
+    t = Math.max(0, Math.min(1, t));
+    return t * t * (3 - 2 * t);
   }
 
-  // Build the main curve path
-  const steps = 80;
+  function curveY(ms) {
+    if (ms <= dawnMs) return horizonY + twilightDepth;
+    if (ms >= duskMs) return horizonY + twilightDepth;
+
+    // Rising edge: dawn → sunrise (below horizon → plateau)
+    if (ms < sunriseMs) {
+      const t = (ms - dawnMs) / (sunriseMs - dawnMs);
+      const h = smoothstep(t);
+      // Goes from twilightDepth below horizon to full plateau height
+      return horizonY + twilightDepth - h * (horizonY + twilightDepth - peakY);
+    }
+
+    // Falling edge: sunset → dusk (plateau → below horizon)
+    if (ms > sunsetMs) {
+      const t = (ms - sunsetMs) / (duskMs - sunsetMs);
+      const h = 1 - smoothstep(t);
+      return horizonY + twilightDepth - h * (horizonY + twilightDepth - peakY);
+    }
+
+    // Flat plateau with gentle dome: sunrise → sunset
+    // Slight dome so it's not ruler-flat (looks more natural)
+    const f = (ms - sunriseMs) / (sunsetMs - sunriseMs);
+    const dome = Math.sin(f * Math.PI) * 0.08;
+    return peakY - dome * (horizonY - peakY);
+  }
+
+  // Build the main curve path (including night extensions)
+  const steps = 100;
   let curvePts = [];
+  // Night before dawn
+  curvePts.push({ x: tx(t0), y: horizonY + twilightDepth });
+  curvePts.push({ x: tx(dawnMs), y: horizonY + twilightDepth });
+  // Dawn through dusk
   for (let i = 0; i <= steps; i++) {
     const ms = dawnMs + (duskMs - dawnMs) * (i / steps);
     curvePts.push({ x: tx(ms), y: curveY(ms) });
   }
+  // Night after dusk
+  curvePts.push({ x: tx(duskMs), y: horizonY + twilightDepth });
+  curvePts.push({ x: tx(t1), y: horizonY + twilightDepth });
 
   // Curve line path
   const curvePath = curvePts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
