@@ -90,14 +90,14 @@ body {
   transition: background 1.5s ease;
 }
 .atmos-day    { background: linear-gradient(170deg, #2563eb 0%, #60a5fa 40%, #93c5fd 100%); }
-.atmos-day .card { --bg-card: rgba(0,0,0,0.25); }
-.atmos-day .current-details span { background: rgba(0,0,0,0.2); }
-.atmos-day .hour-chip { background: rgba(0,0,0,0.15); }
-.atmos-day .hour-chip.now { background: rgba(0,0,0,0.3); }
+.atmos-day .card { --bg-card: rgba(0,0,0,0.3); }
+.atmos-day .current-details span { background: rgba(0,0,0,0.3); }
+.atmos-day .hour-chip { background: rgba(0,0,0,0.2); }
+.atmos-day .hour-chip.now { background: rgba(0,0,0,0.35); }
 .atmos-night  { background: linear-gradient(170deg, #0f172a 0%, #1e1b4b 50%, #1a1a2e 100%); }
 .atmos-dawn   { background: linear-gradient(170deg, #1e3a5f 0%, #d97706 40%, #fbbf24 100%); }
-.atmos-dawn .card { --bg-card: rgba(0,0,0,0.25); }
-.atmos-dawn .current-details span { background: rgba(0,0,0,0.2); }
+.atmos-dawn .card { --bg-card: rgba(0,0,0,0.3); }
+.atmos-dawn .current-details span { background: rgba(0,0,0,0.3); }
 .atmos-dusk   { background: linear-gradient(170deg, #4c1d95 0%, #dc2626 35%, #f59e0b 100%); }
 .atmos-overcast { background: linear-gradient(170deg, #475569 0%, #64748b 50%, #94a3b8 100%); }
 .atmos-overcast .card { --bg-card: rgba(0,0,0,0.45); }
@@ -579,6 +579,7 @@ function updateAtmosphere(weatherCode, lat, lon) {
   else if (weatherCode === 3 && period === 'day') cls = 'atmos-overcast';
 
   atmos.className = cls;
+  document.body.className = cls;
 }
 
 // ── Fetch weather from Open-Meteo ──
