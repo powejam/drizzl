@@ -648,6 +648,7 @@ function render(weather, location) {
   const moon = moonPhase(now);
 
   // ── Current conditions ──
+  const daily = weather.daily;
   let html = `<div class="fade-in">`;
   html += `<div class="current-location">${esc(location.name)}</div>`;
   if (location.region || location.country) {
@@ -742,7 +743,6 @@ function render(weather, location) {
   }
 
   // ── Daily forecast ──
-  const daily = weather.daily;
   const allMin = Math.min(...daily.temperature_2m_min);
   const allMax = Math.max(...daily.temperature_2m_max);
   const range = allMax - allMin || 1;
