@@ -848,96 +848,89 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
     return '<div style="text-align:center;color:var(--text-dim);padding:20px;">Sun data unavailable</div>';
   }
 
-  const W = 400, H = 200;
-  const horizonY = 130;
-  const margin = 20;
-  const graphL = margin, graphR = W - margin;
-  const graphW = graphR - graphL;
-  const peakY = 30; // top of arc
-  const twilightDepth = 18; // how far twilight dips below horizon
+  const W = 400, H = 190;
+  const margin = 16;
+  const graphL = margin, graphR = W - margin, graphW = graphR - graphL;
+  const topY = 28;       // pixel y for curve peak
+  const bottomY = 150;   // pixel y for curve baseline (deepest night)
+  const labelZone = 175;  // y for bottom labels
 
-  // Time mapping: full graph spans from 30min before dawn to 30min after dusk
-  const dawnMs = dawn.getTime();
-  const duskMs = dusk.getTime();
+  // ── Time axis: 24h centered on now ──
+  const nowMs = now.getTime();
+  const halfDay = 12 * 3600000;
+  const tLeft = nowMs - halfDay;
+  const tRight = nowMs + halfDay;
+
+  function tx(ms) { return graphL + ((ms - tLeft) / (tRight - tLeft)) * graphW; }
+
+  // ── Fixed Gaussian bell curve centred on solar noon ──
   const sunriseMs = sunrise.getTime();
   const sunsetMs = sunset.getTime();
-  const nowMs = now.getTime();
-  const pad = (duskMs - dawnMs) * 0.08;
-  const t0 = dawnMs - pad;
-  const t1 = duskMs + pad;
-  const span = t1 - t0;
-
-  function tx(ms) { return graphL + ((ms - t0) / span) * graphW; }
-
-  // Curve: Gaussian bell curve (normal distribution shape)
-  // No hard cutoffs — the Gaussian naturally tapers to near-zero at the edges
+  const dawnMs = dawn.getTime();
+  const duskMs = dusk.getTime();
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
+  const sigma = 3.5 * 3600000; // 3.5 hours in ms
+
+  function gaussian(ms) {
+    return Math.exp(-0.5 * Math.pow((ms - solarNoonMs) / sigma, 2));
+  }
 
   function curveY(ms) {
-    const f = (ms - dawnMs) / (duskMs - dawnMs); // 0 at dawn, 1 at dusk
-    const sigma = 0.22;
-    const h = Math.exp(-0.5 * Math.pow((f - 0.5) / sigma, 2));
-    return horizonY - h * (horizonY - peakY);
+    return bottomY - gaussian(ms) * (bottomY - topY);
   }
 
-  // Build one smooth continuous curve from edge to edge
-  const steps = 120;
+  // ── Horizon line: y-position where curve = sunrise = sunset ──
+  const horizonY = curveY(sunriseMs);
+
+  // ── Build smooth curve across full 24h ──
+  const steps = 150;
   let curvePts = [];
   for (let i = 0; i <= steps; i++) {
-    const ms = t0 + (t1 - t0) * (i / steps);
+    const ms = tLeft + (tRight - tLeft) * (i / steps);
     curvePts.push({ x: tx(ms), y: curveY(ms) });
   }
+  const curvePath = curvePts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+  ).join(' ');
 
-  // Curve line path
-  const curvePath = curvePts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-
-  // Filled daylight area (sunrise to sunset, above horizon)
-  let daylightFill = [];
-  for (let i = 0; i <= steps; i++) {
-    const ms = sunriseMs + (sunsetMs - sunriseMs) * (i / steps);
-    const p = { x: tx(ms), y: curveY(ms) };
-    daylightFill.push(`${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`);
-  }
-  daylightFill.push(`L${tx(sunsetMs).toFixed(1)},${horizonY}`);
-  daylightFill.push(`L${tx(sunriseMs).toFixed(1)},${horizonY} Z`);
-
-  // Twilight fills (dawn→sunrise and sunset→dusk, area between curve and horizon)
-  function twilightFillPath(ms0, ms1) {
-    const pts = [];
-    const s = 40;
-    for (let i = 0; i <= s; i++) {
-      const ms = ms0 + (ms1 - ms0) * (i / s);
-      const p = { x: tx(ms), y: curveY(ms) };
-      pts.push(`${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`);
+  // ── Daylight fill: area between curve and horizon, only above horizon ──
+  let dayFillPts = [];
+  const srX = Math.max(graphL, tx(sunriseMs));
+  const ssX = Math.min(graphR, tx(sunsetMs));
+  if (ssX > srX) {
+    for (let i = 0; i <= 80; i++) {
+      const ms = sunriseMs + (sunsetMs - sunriseMs) * (i / 80);
+      const x = tx(ms);
+      if (x >= graphL && x <= graphR) {
+        dayFillPts.push(`${dayFillPts.length === 0 ? 'M' : 'L'}${x.toFixed(1)},${curveY(ms).toFixed(1)}`);
+      }
     }
-    pts.push(`L${tx(ms1).toFixed(1)},${horizonY}`);
-    pts.push(`L${tx(ms0).toFixed(1)},${horizonY} Z`);
-    return pts.join(' ');
+    dayFillPts.push(`L${ssX.toFixed(1)},${horizonY.toFixed(1)}`);
+    dayFillPts.push(`L${srX.toFixed(1)},${horizonY.toFixed(1)} Z`);
   }
 
-  // Sun position
-  const sunIsUp = nowMs >= dawnMs && nowMs <= duskMs;
-  const isDaytime = nowMs >= sunriseMs && nowMs <= sunsetMs;
-  let sunDot = '';
-  if (sunIsUp) {
-    const sx = tx(nowMs);
-    const sy = curveY(nowMs);
-    sunDot = `
-      <circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="14" fill="url(#sunGlow)" />
-      <circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="7" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.5" />
-      <circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="4" fill="#fef3c7" />`;
+  // ── Centre marker: sun or crescent moon ──
+  const centreX = (graphL + graphR) / 2;
+  const centreY = curveY(nowMs);
+  const isAboveHorizon = centreY < horizonY;
+
+  let marker = '';
+  if (isAboveHorizon) {
+    marker = `
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="14" fill="url(#sunGlow)" />
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="7" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.5" />
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="4" fill="#fef3c7" />`;
+  } else {
+    marker = `
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="7" fill="#e2e8f0" />
+      <circle cx="${(centreX + 3).toFixed(1)}" cy="${(centreY - 2).toFixed(1)}" r="5.5" fill="rgba(0,0,0,0.85)" />`;
   }
 
-  // Key x-positions for labels
-  const xDawn = tx(dawnMs);
-  const xSunrise = tx(sunriseMs);
-  const xNoon = tx(solarNoonMs);
-  const xSunset = tx(sunsetMs);
-  const xDusk = tx(duskMs);
-
-  // Dashed line from sunrise/sunset to top label area
-  const ySunrise = curveY(sunriseMs);
-  const ySunset = curveY(sunsetMs);
+  // ── Label positions ──
+  const xSunrise = tx(sunriseMs), xSunset = tx(sunsetMs);
+  const xDawn = tx(dawnMs), xNoon = tx(solarNoonMs), xDusk = tx(duskMs);
+  function clampX(x) { return Math.max(graphL + 20, Math.min(graphR - 20, x)); }
+  const inView = (ms) => ms >= tLeft && ms <= tRight;
 
   return `<div class="daylight-graph"><svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -946,53 +939,48 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
         <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
       </radialGradient>
       <linearGradient id="dayFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.5"/>
-        <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.15"/>
-      </linearGradient>
-      <linearGradient id="twilightFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.3"/>
+        <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.1"/>
       </linearGradient>
     </defs>
 
-    <!-- Sunrise label (top-left) -->
-    <text x="${xSunrise.toFixed(1)}" y="14" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="10" font-family="var(--font-body)">Sunrise</text>
-    <text x="${xSunrise.toFixed(1)}" y="30" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="14" font-weight="600" font-family="var(--font-display)">${sunriseLabel}</text>
+    ${inView(sunriseMs) ? `
+      <text x="${clampX(xSunrise).toFixed(1)}" y="12" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="9" font-family="var(--font-body)">Sunrise</text>
+      <text x="${clampX(xSunrise).toFixed(1)}" y="26" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="13" font-weight="600" font-family="var(--font-display)">${sunriseLabel}</text>
+    ` : ''}
 
-    <!-- Sunset label (top-right) -->
-    <text x="${xSunset.toFixed(1)}" y="14" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="10" font-family="var(--font-body)">Sunset</text>
-    <text x="${xSunset.toFixed(1)}" y="30" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="14" font-weight="600" font-family="var(--font-display)">${sunsetLabel}</text>
+    ${inView(sunsetMs) ? `
+      <text x="${clampX(xSunset).toFixed(1)}" y="12" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="9" font-family="var(--font-body)">Sunset</text>
+      <text x="${clampX(xSunset).toFixed(1)}" y="26" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="13" font-weight="600" font-family="var(--font-display)">${sunsetLabel}</text>
+    ` : ''}
 
-    <!-- Twilight fills -->
-    <path d="${twilightFillPath(dawnMs, sunriseMs)}" fill="url(#twilightFill)" />
-    <path d="${twilightFillPath(sunsetMs, duskMs)}" fill="url(#twilightFill)" />
+    ${dayFillPts.length > 0 ? `<path d="${dayFillPts.join(' ')}" fill="url(#dayFill)" />` : ''}
 
-    <!-- Daylight fill -->
-    <path d="${daylightFill.join(' ')}" fill="url(#dayFill)" />
+    <line x1="${graphL}" y1="${horizonY.toFixed(1)}" x2="${graphR}" y2="${horizonY.toFixed(1)}" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-dasharray="4,3" />
 
-    <!-- Horizon line -->
-    <line x1="${graphL}" y1="${horizonY}" x2="${graphR}" y2="${horizonY}" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
+    <path d="${curvePath}" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
 
-    <!-- Main curve -->
-    <path d="${curvePath}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" />
+    ${dayFillPts.length > 0 ? `<path d="${curvePts.filter(p => p.y < horizonY - 0.5).map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="rgba(96,165,250,0.75)" stroke-width="2.5" />` : ''}
 
-    <!-- Daylight portion of curve (thicker, brighter) -->
-    <path d="${curvePts.filter(p => p.x >= tx(sunriseMs) && p.x <= tx(sunsetMs)).map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="rgba(96,165,250,0.8)" stroke-width="2.5" />
+    ${marker}
 
-    <!-- Sun position -->
-    ${sunDot}
+    ${inView(dawnMs) ? `
+      <text x="${clampX(xDawn).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="8.5" font-family="var(--font-body)">Dawn</text>
+      <text x="${clampX(xDawn).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="500" font-family="var(--font-display)">${dawnLabel}</text>
+    ` : ''}
 
-    <!-- Bottom labels: Dawn, Solar noon, Dusk -->
-    <text x="${xDawn.toFixed(1)}" y="${horizonY + 32}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="var(--font-body)">Dawn</text>
-    <text x="${xDawn.toFixed(1)}" y="${horizonY + 46}" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-size="12" font-weight="500" font-family="var(--font-display)">${dawnLabel}</text>
+    ${inView(solarNoonMs) ? `
+      <text x="${clampX(xNoon).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="8.5" font-family="var(--font-body)">Solar noon</text>
+      <text x="${clampX(xNoon).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="500" font-family="var(--font-display)">${noonLabel}</text>
+    ` : ''}
 
-    <text x="${xNoon.toFixed(1)}" y="${horizonY + 32}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="var(--font-body)">Solar noon</text>
-    <text x="${xNoon.toFixed(1)}" y="${horizonY + 46}" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-size="12" font-weight="500" font-family="var(--font-display)">${noonLabel}</text>
-
-    <text x="${xDusk.toFixed(1)}" y="${horizonY + 32}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="var(--font-body)">Dusk</text>
-    <text x="${xDusk.toFixed(1)}" y="${horizonY + 46}" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-size="12" font-weight="500" font-family="var(--font-display)">${duskLabel}</text>
+    ${inView(duskMs) ? `
+      <text x="${clampX(xDusk).toFixed(1)}" y="${labelZone - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="8.5" font-family="var(--font-body)">Dusk</text>
+      <text x="${clampX(xDusk).toFixed(1)}" y="${labelZone + 10}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="500" font-family="var(--font-display)">${duskLabel}</text>
+    ` : ''}
   </svg></div>`;
 }
+
 
 function renderMoonDisc(moon) {
   // CSS-based moon phase rendering
