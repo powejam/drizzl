@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drizzl-weather-v3';
+const CACHE_NAME = 'drizzl-weather-v4';
 const STATIC_ASSETS = [
   '/drizzl/',
   '/drizzl/index.html',
@@ -9,7 +9,9 @@ const STATIC_ASSETS = [
   '/drizzl/fonts/dm-sans-latin-300-normal.woff2',
   '/drizzl/fonts/dm-sans-latin-400-normal.woff2',
   '/drizzl/fonts/dm-sans-latin-500-normal.woff2',
-  '/drizzl/fonts/dm-sans-latin-600-normal.woff2'
+  '/drizzl/fonts/dm-sans-latin-600-normal.woff2',
+  '/drizzl/icons/icon-192.png',
+  '/drizzl/icons/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
