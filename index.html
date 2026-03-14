@@ -984,23 +984,86 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
 
 
 function renderMoonDisc(moon) {
-  // CSS-based moon phase rendering
+  // SVG-based moon phase with elliptical terminator
+  // fraction: 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
   const f = moon.fraction;
-  let shadowLeft, shadowWidth, shadowBorder;
+  const size = 40;
+  const r = size / 2;
+  const cx = r, cy = r;
 
-  // We create the shadow using a CSS approach
-  // fraction 0 = new (full shadow), 0.5 = full (no shadow)
+  // The illuminated portion is determined by the terminator line
+  // which is an ellipse whose x-radius varies with phase
+  // Right side is always lit for waxing (0→0.5), left for waning (0.5→1)
+
+  let lightSide, terminatorRx;
+
   if (f <= 0.5) {
-    // Waxing: shadow recedes from right to left
-    const t = f / 0.5; // 0 to 1
-    const w = (1 - t) * 100;
-    return `<div class="moon-disc"><div class="moon-shadow" style="right:0;width:${w}%;border-radius:${t < 0.5 ? '0' : '50% 0 0 50%'};"></div></div>`;
+    // Waxing: right side lit
+    lightSide = 'right';
+    // terminatorRx: at new moon (0) = full radius (shadow covers all from right edge)
+    // at first quarter (0.25) = 0 (straight line)
+    // at full (0.5) = full radius (no shadow)
+    terminatorRx = Math.abs(1 - f * 4) * r;
+    // 0→0.25: terminator curves right (shadow side), lit crescent on right
+    // 0.25→0.5: terminator curves left (lit side expands), gibbous
   } else {
-    // Waning: shadow grows from right to left
-    const t = (f - 0.5) / 0.5; // 0 to 1
-    const w = t * 100;
-    return `<div class="moon-disc"><div class="moon-shadow" style="left:0;width:${w}%;border-radius:${t > 0.5 ? '0' : '0 50% 50% 0'};"></div></div>`;
+    // Waning: left side lit
+    lightSide = 'left';
+    terminatorRx = Math.abs(1 - (f - 0.5) * 4) * r;
   }
+
+  // Build the lit area path
+  // The lit half is a semicircle, the terminator is an elliptical arc
+  let litPath;
+
+  if (f < 0.01 || f > 0.99) {
+    // New moon — all dark
+    return `<div style="width:${size}px;height:${size}px;flex-shrink:0;">
+      <svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#2a2a3e"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+      </svg></div>`;
+  }
+
+  if (f > 0.49 && f < 0.51) {
+    // Full moon — all lit
+    return `<div style="width:${size}px;height:${size}px;flex-shrink:0;">
+      <svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#e8e8d0"/>
+        <circle cx="${cx}" cy="${cy}" r="${r-0.5}" fill="none" stroke="rgba(255,255,200,0.3)" stroke-width="0.5"/>
+      </svg></div>`;
+  }
+
+  // Lit semicircle arc (right side for waxing, left for waning)
+  // Terminator elliptical arc sweeps from top to bottom
+  if (lightSide === 'right') {
+    if (f < 0.25) {
+      // Waxing crescent: thin lit sliver on right
+      // Right semicircle arc + terminator curving right (into lit side)
+      litPath = `M${cx},${cy - r} A${r},${r} 0 0,1 ${cx},${cy + r} A${terminatorRx},${r} 0 0,1 ${cx},${cy - r}`;
+    } else {
+      // Waxing gibbous: most lit, shadow crescent on left
+      // Right semicircle + terminator curving left (into shadow side)
+      litPath = `M${cx},${cy - r} A${r},${r} 0 0,1 ${cx},${cy + r} A${terminatorRx},${r} 0 0,0 ${cx},${cy - r}`;
+    }
+  } else {
+    if (f < 0.75) {
+      // Waning gibbous: most lit, shadow crescent on right
+      // Left semicircle + terminator curving right (into shadow side)
+      litPath = `M${cx},${cy - r} A${r},${r} 0 0,0 ${cx},${cy + r} A${terminatorRx},${r} 0 0,1 ${cx},${cy - r}`;
+    } else {
+      // Waning crescent: thin lit sliver on left
+      // Left semicircle + terminator curving left (into lit side)
+      litPath = `M${cx},${cy - r} A${r},${r} 0 0,0 ${cx},${cy + r} A${terminatorRx},${r} 0 0,0 ${cx},${cy - r}`;
+    }
+  }
+
+  return `<div style="width:${size}px;height:${size}px;flex-shrink:0;">
+    <svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#2a2a3e"/>
+      <path d="${litPath}" fill="#e8e8d0"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+    </svg></div>`;
 }
 
 function isDay(weather, now) {
