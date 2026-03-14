@@ -179,7 +179,7 @@ body {
 }
 .fav-list li .fav-remove:hover { opacity: 1; }
 .section-label {
-  font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+  font-size: 1.2rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.08em; color: var(--text-dim);
   padding: 16px 0 8px;
 }
@@ -196,7 +196,7 @@ body {
 }
 .card-title {
   font-family: var(--font-display);
-  font-size: 0.8rem; font-weight: 600;
+  font-size: 1.1rem; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-secondary);
   margin-bottom: 14px;
@@ -224,14 +224,14 @@ body {
 .current-icon { font-size: 4rem; line-height: 1; margin-top: 4px; }
 .current-details {
   display: flex; flex-wrap: wrap; gap: 8px;
-  font-size: 0.85rem; color: var(--text-secondary);
+  font-size: 1rem; color: var(--text-secondary);
 }
 .current-details span {
   background: rgba(255,255,255,0.15);
   padding: 6px 12px; border-radius: 20px;
 }
 .current-desc {
-  font-size: 1.05rem; margin-bottom: 12px; font-weight: 400;
+  font-size: 1.15rem; margin-bottom: 12px; font-weight: 400;
 }
 
 /* ── Hourly scroll ── */
@@ -245,16 +245,16 @@ body {
   flex-shrink: 0;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 12px; border-radius: var(--radius-sm);
-  font-size: 0.8rem; min-width: 64px;
+  font-size: 0.95rem; min-width: 72px;
   background: rgba(255,255,255,0.12);
   transition: background 0.15s;
 }
 .hour-chip.now { background: rgba(96,165,250,0.3); }
-.hour-chip .h-time { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; }
-.hour-chip .h-icon { font-size: 1.3rem; }
-.hour-chip .h-temp { font-weight: 600; font-size: 0.9rem; }
-.hour-chip .h-precip { font-size: 0.7rem; color: #93c5fd; }
-.hour-chip .h-wind { font-size: 0.65rem; color: var(--text-secondary); white-space: nowrap; }
+.hour-chip .h-time { color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; }
+.hour-chip .h-icon { font-size: 1.5rem; }
+.hour-chip .h-temp { font-weight: 600; font-size: 1.05rem; }
+.hour-chip .h-precip { font-size: 0.85rem; color: #93c5fd; }
+.hour-chip .h-wind { font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; }
 
 /* ── Daily forecast ── */
 .daily-row {
@@ -263,13 +263,13 @@ body {
   border-bottom: 1px solid rgba(255,255,255,0.15);
 }
 .daily-row:last-child { border-bottom: none; }
-.daily-day { width: 42px; font-size: 0.85rem; font-weight: 500; }
-.daily-icon { font-size: 1.3rem; width: 32px; text-align: center; }
-.daily-precip { font-size: 0.75rem; color: #93c5fd; width: 36px; text-align: right; }
-.daily-wind { font-size: 0.7rem; color: var(--text-secondary); width: 52px; text-align: right; white-space: nowrap; }
+.daily-day { width: 48px; font-size: 1rem; font-weight: 500; }
+.daily-icon { font-size: 1.5rem; width: 36px; text-align: center; }
+.daily-precip { font-size: 0.9rem; color: #93c5fd; width: 40px; text-align: right; }
+.daily-wind { font-size: 0.85rem; color: var(--text-secondary); width: 60px; text-align: right; white-space: nowrap; }
 .daily-bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
-.daily-lo { font-size: 0.8rem; color: var(--text-dim); width: 32px; text-align: right; }
-.daily-hi { font-size: 0.8rem; font-weight: 600; width: 32px; }
+.daily-lo { font-size: 0.95rem; color: var(--text-dim); width: 32px; text-align: right; }
+.daily-hi { font-size: 0.95rem; font-weight: 600; width: 32px; }
 .daily-bar {
   flex: 1; height: 5px; border-radius: 3px;
   background: rgba(255,255,255,0.12);
@@ -293,7 +293,7 @@ body {
   display: flex; justify-content: center; gap: 24px;
   padding-top: 14px; margin-top: 10px;
   border-top: 1px solid rgba(255,255,255,0.1);
-  font-size: 0.95rem; color: var(--text-secondary);
+  font-size: 1.1rem; color: var(--text-secondary);
 }
 .daylight-summary span { font-weight: 500; color: var(--text-primary); }
 .moon-row {
@@ -314,8 +314,8 @@ body {
   transition: all 0.3s;
 }
 .moon-info { flex: 1; }
-.moon-name { font-size: 1.05rem; font-weight: 500; }
-.moon-illum { font-size: 0.9rem; color: var(--text-secondary); }
+.moon-name { font-size: 1.2rem; font-weight: 500; }
+.moon-illum { font-size: 1.05rem; color: var(--text-secondary); }
 
 /* ── Wind details ── */
 .wind-details {
