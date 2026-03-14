@@ -657,10 +657,13 @@ function render(weather, location) {
   </div>`;
   html += `<div class="current-desc">${wmoDesc(c.weather_code)}</div>`;
   html += `<div class="current-details">
-    <span>Feels ${fmt(c.apparent_temperature, 0)}°</span>
+    <span>🌡️ Feels ${fmt(c.apparent_temperature, 0)}°</span>
     <span>💧 ${fmt(c.relative_humidity_2m, 0)}%</span>
     <span>💨 ${fmt(c.wind_speed_10m, 0)} km/h ${windDir(c.wind_direction_10m)}</span>
     <span>🔽 ${fmt(c.surface_pressure, 0)} hPa</span>
+    <span>☁️ ${fmt(c.cloud_cover, 0)}%</span>
+    <span>☔ ${fmt(c.precipitation, 1)} mm</span>
+    <span>☀️ UV ${fmt(daily.uv_index_max[0], 0)}</span>
   </div>`;
 
   // ── Hourly forecast helpers ──
@@ -761,43 +764,6 @@ function render(weather, location) {
     </div>`;
   }
   html += `</div>`;
-
-  // ── Wind & Conditions ──
-  html += `<div class="card">
-    <div class="card-title">Conditions</div>
-    <div class="wind-details">
-      <div class="detail-item">
-        <div class="detail-icon">💨</div>
-        <div class="detail-value">${fmt(c.wind_speed_10m, 0)}</div>
-        <div class="detail-label">km/h ${windDir(c.wind_direction_10m)}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-icon">💧</div>
-        <div class="detail-value">${fmt(c.relative_humidity_2m, 0)}%</div>
-        <div class="detail-label">Humidity</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-icon">🌡️</div>
-        <div class="detail-value">${fmt(c.surface_pressure, 0)}</div>
-        <div class="detail-label">hPa</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-icon">☁️</div>
-        <div class="detail-value">${fmt(c.cloud_cover, 0)}%</div>
-        <div class="detail-label">Cloud Cover</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-icon">☔</div>
-        <div class="detail-value">${fmt(c.precipitation, 1)}</div>
-        <div class="detail-label">mm precip</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-icon">☀️</div>
-        <div class="detail-value">${fmt(daily.uv_index_max[0], 0)}</div>
-        <div class="detail-label">UV Index</div>
-      </div>
-    </div>
-  </div>`;
 
   // ── Daylight Graph ──
   const tz = weather.timezone;
