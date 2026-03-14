@@ -660,33 +660,75 @@ function render(weather, location) {
     <span>🔽 ${fmt(c.surface_pressure, 0)} hPa</span>
   </div>`;
 
-  // ── Hourly forecast ──
-  html += `<div class="card" style="margin-top:20px;">
-    <div class="card-title">Hourly Forecast</div>
-    <div class="hourly-scroll">`;
-
-  const nowHour = now.getHours();
+  // ── Hourly forecast helpers ──
   const hourlyTimes = weather.hourly.time;
   // Find current hour index
   const nowISO = now.toISOString().slice(0, 13);
   let startIdx = hourlyTimes.findIndex(t => t.startsWith(nowISO));
   if (startIdx < 0) startIdx = 0;
 
-  for (let i = startIdx; i < Math.min(startIdx + 30, hourlyTimes.length); i++) {
-    const t = new Date(hourlyTimes[i]);
-    const hh = t.getHours();
-    const label = i === startIdx ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
-    const icon = wmoIcon(weather.hourly.weather_code[i], weather.hourly.is_day[i] === 0);
-    const temp = fmt(weather.hourly.temperature_2m[i], 0);
-    const precip = weather.hourly.precipitation_probability[i];
-    html += `<div class="hour-chip${i === startIdx ? ' now' : ''}">
-      <span class="h-time">${label}</span>
-      <span class="h-icon">${icon}</span>
-      <span class="h-temp">${temp}°</span>
-      ${precip > 5 ? `<span class="h-precip">${fmt(precip, 0)}%</span>` : ''}
+  // Find midnight boundaries
+  // Open-Meteo hourly times are in location timezone, e.g. "2026-03-14T08:00"
+  const todayDate = hourlyTimes[startIdx].slice(0, 10); // e.g. "2026-03-14"
+
+  // Compute tomorrow's date string by finding the next distinct date in the data
+  let tomorrowDate = null;
+  for (let i = startIdx; i < hourlyTimes.length; i++) {
+    const d = hourlyTimes[i].slice(0, 10);
+    if (d !== todayDate) { tomorrowDate = d; break; }
+  }
+
+  const tomorrowMidnightIdx = tomorrowDate
+    ? hourlyTimes.indexOf(tomorrowDate + 'T00:00')
+    : -1;
+
+  // Day after tomorrow
+  let dayAfterDate = null;
+  if (tomorrowMidnightIdx >= 0) {
+    for (let i = tomorrowMidnightIdx; i < hourlyTimes.length; i++) {
+      const d = hourlyTimes[i].slice(0, 10);
+      if (d !== tomorrowDate) { dayAfterDate = d; break; }
+    }
+  }
+  const dayAfterMidnightIdx = dayAfterDate
+    ? hourlyTimes.indexOf(dayAfterDate + 'T00:00')
+    : -1;
+
+  function renderHourChips(fromIdx, toIdx, firstIsNow) {
+    let chips = '';
+    for (let i = fromIdx; i < toIdx && i < hourlyTimes.length; i++) {
+      const t = new Date(hourlyTimes[i]);
+      const hh = t.getHours();
+      const label = (i === fromIdx && firstIsNow) ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
+      const icon = wmoIcon(weather.hourly.weather_code[i], weather.hourly.is_day[i] === 0);
+      const temp = fmt(weather.hourly.temperature_2m[i], 0);
+      const precip = weather.hourly.precipitation_probability[i];
+      const isNowCls = (i === fromIdx && firstIsNow) ? ' now' : '';
+      chips += `<div class="hour-chip${isNowCls}">
+        <span class="h-time">${label}</span>
+        <span class="h-icon">${icon}</span>
+        <span class="h-temp">${temp}°</span>
+        ${precip > 5 ? `<span class="h-precip">${fmt(precip, 0)}%</span>` : ''}
+      </div>`;
+    }
+    return chips;
+  }
+
+  // ── Today's hourly forecast (now → midnight) ──
+  const todayEndIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 12;
+  html += `<div class="card" style="margin-top:20px;">
+    <div class="card-title">Today</div>
+    <div class="hourly-scroll">${renderHourChips(startIdx, todayEndIdx, true)}</div>
+  </div>`;
+
+  // ── Tomorrow's hourly forecast (midnight → midnight) ──
+  if (tomorrowMidnightIdx > 0) {
+    const tomorrowEndIdx = dayAfterMidnightIdx > tomorrowMidnightIdx ? dayAfterMidnightIdx : tomorrowMidnightIdx + 24;
+    html += `<div class="card">
+      <div class="card-title">Tomorrow</div>
+      <div class="hourly-scroll">${renderHourChips(tomorrowMidnightIdx, tomorrowEndIdx, false)}</div>
     </div>`;
   }
-  html += `</div></div>`;
 
   // ── Daily forecast ──
   const daily = weather.daily;
