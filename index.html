@@ -863,20 +863,21 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
 
   function tx(ms) { return graphL + ((ms - tLeft) / (tRight - tLeft)) * graphW; }
 
-  // ── Fixed Gaussian bell curve centred on solar noon ──
+  // ── Cosine wave with 24h period, peak at solar noon ──
   const sunriseMs = sunrise.getTime();
   const sunsetMs = sunset.getTime();
   const dawnMs = dawn.getTime();
   const duskMs = dusk.getTime();
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
-  const sigma = 3.5 * 3600000; // 3.5 hours in ms
+  const dayLength = 24 * 3600000;
 
-  function gaussian(ms) {
-    return Math.exp(-0.5 * Math.pow((ms - solarNoonMs) / sigma, 2));
+  function curveHeight(ms) {
+    // Cosine wave: 1 at solar noon, 0 at solar midnight, smooth throughout
+    return (1 + Math.cos(2 * Math.PI * (ms - solarNoonMs) / dayLength)) / 2;
   }
 
   function curveY(ms) {
-    return bottomY - gaussian(ms) * (bottomY - topY);
+    return bottomY - curveHeight(ms) * (bottomY - topY);
   }
 
   // ── Horizon line: y-position where curve = sunrise = sunset ──
