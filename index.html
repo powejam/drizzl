@@ -253,26 +253,26 @@ body {
 .hour-chip .h-time { color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; }
 .hour-chip .h-icon { font-size: 1.5rem; }
 .hour-chip .h-temp { font-weight: 600; font-size: 1.05rem; }
-.hour-chip .h-precip { font-size: 0.85rem; color: #93c5fd; }
+.hour-chip .h-precip { font-size: 0.85rem; color: #b3d4fc; }
 .hour-chip .h-wind { font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; }
 
 /* ── Daily forecast ── */
 .daily-row {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.15);
+  border-bottom: 1px solid rgba(255,255,255,0.25);
 }
 .daily-row:last-child { border-bottom: none; }
-.daily-day { width: 48px; font-size: 1rem; font-weight: 500; }
+.daily-day { width: 48px; font-size: 1rem; font-weight: 600; }
 .daily-icon { font-size: 1.5rem; width: 36px; text-align: center; }
-.daily-precip { font-size: 0.9rem; color: #93c5fd; width: 40px; text-align: right; }
-.daily-wind { font-size: 0.85rem; color: var(--text-secondary); width: 60px; text-align: right; white-space: nowrap; }
+.daily-precip { font-size: 0.9rem; color: #b3d4fc; width: 40px; text-align: right; }
+.daily-wind { font-size: 0.85rem; color: var(--text-primary); width: 60px; text-align: right; white-space: nowrap; }
 .daily-bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
-.daily-lo { font-size: 0.95rem; color: var(--text-dim); width: 32px; text-align: right; }
-.daily-hi { font-size: 0.95rem; font-weight: 600; width: 32px; }
+.daily-lo { font-size: 0.95rem; color: var(--text-secondary); width: 32px; text-align: right; }
+.daily-hi { font-size: 0.95rem; font-weight: 700; width: 32px; }
 .daily-bar {
-  flex: 1; height: 5px; border-radius: 3px;
-  background: rgba(255,255,255,0.12);
+  flex: 1; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.2);
   position: relative; overflow: hidden;
 }
 .daily-bar-fill {
