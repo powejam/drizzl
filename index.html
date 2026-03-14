@@ -870,32 +870,23 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
   function tx(ms) { return graphL + ((ms - t0) / span) * graphW; }
 
   // Curve: Gaussian bell curve (normal distribution shape)
+  // No hard cutoffs — the Gaussian naturally tapers to near-zero at the edges
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
 
   function curveY(ms) {
-    if (ms <= dawnMs) return horizonY + twilightDepth;
-    if (ms >= duskMs) return horizonY + twilightDepth;
-
-    const f = (ms - dawnMs) / (duskMs - dawnMs); // 0 to 1
+    const f = (ms - dawnMs) / (duskMs - dawnMs); // 0 at dawn, 1 at dusk
     const sigma = 0.22;
     const h = Math.exp(-0.5 * Math.pow((f - 0.5) / sigma, 2));
     return horizonY - h * (horizonY - peakY);
   }
 
-  // Build the main curve path (including night extensions)
-  const steps = 100;
+  // Build one smooth continuous curve from edge to edge
+  const steps = 120;
   let curvePts = [];
-  // Night before dawn
-  curvePts.push({ x: tx(t0), y: horizonY + twilightDepth });
-  curvePts.push({ x: tx(dawnMs), y: horizonY + twilightDepth });
-  // Dawn through dusk
   for (let i = 0; i <= steps; i++) {
-    const ms = dawnMs + (duskMs - dawnMs) * (i / steps);
+    const ms = t0 + (t1 - t0) * (i / steps);
     curvePts.push({ x: tx(ms), y: curveY(ms) });
   }
-  // Night after dusk
-  curvePts.push({ x: tx(duskMs), y: horizonY + twilightDepth });
-  curvePts.push({ x: tx(t1), y: horizonY + twilightDepth });
 
   // Curve line path
   const curvePath = curvePts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
@@ -910,23 +901,19 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
   daylightFill.push(`L${tx(sunsetMs).toFixed(1)},${horizonY}`);
   daylightFill.push(`L${tx(sunriseMs).toFixed(1)},${horizonY} Z`);
 
-  // Twilight fills (dawn→sunrise and sunset→dusk, the area between curve and horizon)
+  // Twilight fills (dawn→sunrise and sunset→dusk, area between curve and horizon)
   function twilightFillPath(ms0, ms1) {
     const pts = [];
-    const s = 30;
+    const s = 40;
     for (let i = 0; i <= s; i++) {
       const ms = ms0 + (ms1 - ms0) * (i / s);
       const p = { x: tx(ms), y: curveY(ms) };
       pts.push(`${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`);
     }
-    pts.push(`L${tx(ms1).toFixed(1)},${horizonY + twilightDepth}`);
-    pts.push(`L${tx(ms0).toFixed(1)},${horizonY + twilightDepth} Z`);
+    pts.push(`L${tx(ms1).toFixed(1)},${horizonY}`);
+    pts.push(`L${tx(ms0).toFixed(1)},${horizonY} Z`);
     return pts.join(' ');
   }
-
-  // Night fill: left of dawn and right of dusk
-  const nightL = `M${graphL},${horizonY + twilightDepth} L${graphL},${horizonY} L${tx(dawnMs).toFixed(1)},${horizonY} L${tx(dawnMs).toFixed(1)},${horizonY + twilightDepth} Z`;
-  const nightR = `M${tx(duskMs).toFixed(1)},${horizonY + twilightDepth} L${tx(duskMs).toFixed(1)},${horizonY} L${graphR},${horizonY} L${graphR},${horizonY + twilightDepth} Z`;
 
   // Sun position
   const sunIsUp = nowMs >= dawnMs && nowMs <= duskMs;
@@ -975,10 +962,6 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
     <!-- Sunset label (top-right) -->
     <text x="${xSunset.toFixed(1)}" y="14" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="10" font-family="var(--font-body)">Sunset</text>
     <text x="${xSunset.toFixed(1)}" y="30" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="14" font-weight="600" font-family="var(--font-display)">${sunsetLabel}</text>
-
-    <!-- Night fills -->
-    <path d="${nightL}" fill="rgba(15,23,42,0.5)" />
-    <path d="${nightR}" fill="rgba(15,23,42,0.5)" />
 
     <!-- Twilight fills -->
     <path d="${twilightFillPath(dawnMs, sunriseMs)}" fill="url(#twilightFill)" />
