@@ -711,7 +711,7 @@ function render(weather, location) {
         <span class="h-time">${label}</span>
         <span class="h-icon">${icon}</span>
         <span class="h-temp">${temp}°</span>
-        ${precip > 5 ? `<span class="h-precip">${fmt(precip, 0)}%</span>` : ''}
+        <span class="h-precip">${fmt(precip, 0)}%</span>
       </div>`;
     }
     return chips;
@@ -752,7 +752,7 @@ function render(weather, location) {
     html += `<div class="daily-row">
       <span class="daily-day">${dayLabel}</span>
       <span class="daily-icon">${wmoDailyIcon(daily.weather_code[i])}</span>
-      <span class="daily-precip">${precip > 5 ? fmt(precip, 0) + '%' : ''}</span>
+      <span class="daily-precip">${fmt(precip, 0)}%</span>
       <div class="daily-bar-wrap">
         <span class="daily-lo">${fmt(lo,0)}°</span>
         <div class="daily-bar"><div class="daily-bar-fill" style="left:${left}%;width:${Math.max(width,4)}%"></div></div>
