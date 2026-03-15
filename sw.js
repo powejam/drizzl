@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drizzl-weather-v33';
+const CACHE_NAME = 'drizzl-weather-v34';
 const STATIC_ASSETS = [
   '/drizzl/',
   '/drizzl/index.html',

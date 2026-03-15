@@ -209,7 +209,11 @@ body {
   margin-bottom: 2px; letter-spacing: -0.02em;
 }
 .current-region {
-  font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;
+  font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;
+}
+.current-localtime {
+  font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;
+  font-variant-numeric: tabular-nums;
 }
 .current-main {
   display: flex; align-items: flex-start; gap: 16px;
@@ -666,6 +670,16 @@ function render(weather, location) {
   html += `<div class="current-location">${esc(location.name)}</div>`;
   if (location.region || location.country) {
     html += `<div class="current-region">${esc([location.region, location.country].filter(Boolean).join(', '))}</div>`;
+  }
+  {
+    const locNow = new Date(now.getTime() + (weather.utc_offset_seconds * 1000) + (now.getTimezoneOffset() * 60000));
+    const locTime = locNow.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const offsetSec = weather.utc_offset_seconds;
+    const sign = offsetSec >= 0 ? '+' : '-';
+    const absH = Math.floor(Math.abs(offsetSec) / 3600);
+    const absM = Math.floor((Math.abs(offsetSec) % 3600) / 60);
+    const utcLabel = absM === 0 ? `UTC${sign}${absH}` : `UTC${sign}${absH}:${String(absM).padStart(2,'0')}`;
+    html += `<div class="current-localtime">Local time ${locTime} · ${utcLabel}</div>`;
   }
   html += `<div class="current-main">
     <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
