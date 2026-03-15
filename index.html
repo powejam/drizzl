@@ -653,7 +653,11 @@ function render(weather, location) {
   updateAtmosphere(c.weather_code, location.lat, location.lon);
   updateFavBtn();
 
-  const times = sunTimes(now, location.lat, location.lon);
+  // Shift 'now' so its local getters return the location's current date (not the browser's).
+  // sunTimes() uses date.getFullYear()/.getMonth()/.getDate() internally, so this ensures
+  // dawn/dusk are computed for the correct calendar day at the remote location.
+  const _locShift = (weather.utc_offset_seconds * 1000) + (now.getTimezoneOffset() * 60000);
+  const times = sunTimes(new Date(now.getTime() + _locShift), location.lat, location.lon);
   const moon = moonPhase(now);
 
   // ── Current conditions ──
@@ -789,10 +793,24 @@ function render(weather, location) {
 
   // ── Daylight Graph ──
   const tz = weather.timezone;
+  const utcOffset = weather.utc_offset_seconds; // always present when timezone=auto
+
+  // Open-Meteo returns sunrise/sunset as bare ISO strings (e.g. "2026-03-15T06:01") in the
+  // location's local time, with no timezone designator.  new Date() would interpret those as
+  // browser-local time, giving a result that's wrong for any browser not in the location's tz.
+  // Appending the explicit UTC offset fixes the parse.
+  function parseApiTime(str) {
+    if (!str) return null;
+    const sign = utcOffset >= 0 ? '+' : '-';
+    const a    = Math.abs(utcOffset);
+    const hh   = String(Math.floor(a / 3600)).padStart(2, '0');
+    const mm   = String(Math.floor((a % 3600) / 60)).padStart(2, '0');
+    return new Date(`${str}${sign}${hh}:${mm}`);
+  }
 
   // Get actual Date objects for the key sun events
-  const sunriseDate = daily.sunrise ? new Date(daily.sunrise[0]) : (times.sun ? times.sun.rise : null);
-  const sunsetDate  = daily.sunset  ? new Date(daily.sunset[0])  : (times.sun ? times.sun.set  : null);
+  const sunriseDate = daily.sunrise ? parseApiTime(daily.sunrise[0]) : (times.sun ? times.sun.rise : null);
+  const sunsetDate  = daily.sunset  ? parseApiTime(daily.sunset[0])  : (times.sun ? times.sun.set  : null);
   const dawnDate = times.civil ? times.civil.rise : null;
   const duskDate = times.civil ? times.civil.set  : null;
   const solarNoonDate = sunriseDate && sunsetDate ? new Date((sunriseDate.getTime() + sunsetDate.getTime()) / 2) : null;
