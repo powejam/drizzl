@@ -719,16 +719,20 @@ function render(weather, location) {
       const hh = t.getHours();
       const label = (i === fromIdx && firstIsNow) ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
       const precip = weather.hourly.precipitation_probability[i];
+      const precipMm = weather.hourly.precipitation[i];
       const icon = wmoIcon(adjustCode(weather.hourly.weather_code[i], precip), weather.hourly.is_day[i] === 0);
       const temp = fmt(weather.hourly.temperature_2m[i], 0);
       const windSpd = fmt(weather.hourly.wind_speed_10m[i], 0);
       const windD = windDir(weather.hourly.wind_direction_10m[i]);
       const isNowCls = (i === fromIdx && firstIsNow) ? ' now' : '';
+      const precipLabel = precip > 0
+        ? `${fmt(precip, 0)}% · ${fmt(precipMm, 1)}mm`
+        : `${fmt(precip, 0)}%`;
       chips += `<div class="hour-chip${isNowCls}">
         <span class="h-time">${label}</span>
         <span class="h-icon">${icon}</span>
         <span class="h-temp">${temp}°</span>
-        <span class="h-precip">${fmt(precip, 0)}%</span>
+        <span class="h-precip">${precipLabel}</span>
         <span class="h-wind">💨${windSpd} ${windD}</span>
       </div>`;
     }
