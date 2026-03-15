@@ -725,8 +725,9 @@ function render(weather, location) {
       const windSpd = fmt(weather.hourly.wind_speed_10m[i], 0);
       const windD = windDir(weather.hourly.wind_direction_10m[i]);
       const isNowCls = (i === fromIdx && firstIsNow) ? ' now' : '';
+      const precipMmStr = precipMm < 0.05 ? '<0.1mm' : `${fmt(precipMm, 1)}mm`;
       const precipLabel = precip > 0
-        ? `${fmt(precip, 0)}% · ${fmt(precipMm, 1)}mm`
+        ? `${fmt(precip, 0)}% · ${precipMmStr}`
         : `${fmt(precip, 0)}%`;
       chips += `<div class="hour-chip${isNowCls}">
         <span class="h-time">${label}</span>
