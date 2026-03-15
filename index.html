@@ -861,13 +861,7 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
   const bottomY = 155;   // pixel y for curve baseline (deepest night)
   const labelZone = 185;  // y for bottom labels
 
-  // ── Time axis: 24h centered on now ──
   const nowMs = now.getTime();
-  const halfDay = 12 * 3600000;
-  const tLeft = nowMs - halfDay;
-  const tRight = nowMs + halfDay;
-
-  function tx(ms) { return graphL + ((ms - tLeft) / (tRight - tLeft)) * graphW; }
 
   // ── Cosine wave with 24h period, peak at solar noon ──
   const sunriseMs = sunrise.getTime();
@@ -875,6 +869,19 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
   const dawnMs = dawn.getTime();
   const duskMs = dusk.getTime();
   const solarNoonMs = (sunriseMs + sunsetMs) / 2;
+
+  // ── Time axis: 24h centered on solar noon ──
+  // Centering on browser "now" breaks when the browser's calendar date differs
+  // from the location's (e.g. UK browser at 17:44 UTC viewing Bangkok at 00:44
+  // local): Open-Meteo returns the location's current day, so sunrise/sunset
+  // can fall completely outside a ±12h window around the browser clock.
+  // Centering on solar noon guarantees sunrise (~-6h) and sunset (~+6h) are
+  // always symmetrically in view regardless of the viewer's timezone.
+  const halfDay = 12 * 3600000;
+  const tLeft  = solarNoonMs - halfDay;
+  const tRight = solarNoonMs + halfDay;
+
+  function tx(ms) { return graphL + ((ms - tLeft) / (tRight - tLeft)) * graphW; }
   const dayLength = 24 * 3600000;
 
   function curveHeight(ms) {
@@ -917,7 +924,7 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
   }
 
   // ── Centre marker: sun or crescent moon ──
-  const centreX = (graphL + graphR) / 2;
+  const centreX = Math.max(graphL + 14, Math.min(graphR - 14, tx(nowMs)));
   const centreY = curveY(nowMs);
   const isAboveHorizon = centreY < horizonY;
 
