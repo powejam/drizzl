@@ -470,6 +470,24 @@ function wmoIcon(code, isNight) {
 }
 function wmoDailyIcon(code) { return (WMO[code] || WMO[0])[1]; }
 
+// Return the most representative daytime weather code for a given date string
+// by finding the modal hourly code during is_day hours.
+// Falls back to the supplied daily code if no daytime hours are found.
+function representativeDailyCode(dateStr, fallbackCode, hourly) {
+  const freq = {};
+  for (let i = 0; i < hourly.time.length; i++) {
+    if (!hourly.time[i].startsWith(dateStr)) continue;
+    if (hourly.is_day[i] !== 1) continue;
+    const code = hourly.weather_code[i];
+    freq[code] = (freq[code] || 0) + 1;
+  }
+  const entries = Object.entries(freq);
+  if (!entries.length) return fallbackCode;
+  // Pick the code with the highest frequency; ties broken by lower (less severe) code
+  entries.sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  return Number(entries[0][0]);
+}
+
 // ── Sun / twilight calculations ──
 function julianDay(date) {
   const y = date.getUTCFullYear(), m = date.getUTCMonth() + 1, d = date.getUTCDate();
@@ -793,7 +811,7 @@ function render(weather, location) {
     const dWindD = windDir(daily.wind_direction_10m_dominant[i]);
     html += `<div class="daily-row">
       <span class="daily-day">${dayLabel}</span>
-      <span class="daily-icon">${wmoDailyIcon(adjustCode(daily.weather_code[i], precip))}</span>
+      <span class="daily-icon">${wmoDailyIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly), precip))}</span>
       <span class="daily-precip">${fmt(precip, 0)}%</span>
       <span class="daily-wind">💨${dWindSpd} ${dWindD}</span>
       <div class="daily-bar-wrap">
