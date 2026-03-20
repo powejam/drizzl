@@ -160,7 +160,10 @@ body {
 .search-box input:focus { border-color: var(--accent); }
 .search-results, .fav-list {
   list-style: none;
-  overflow-y: auto; flex: 1;
+  overflow-y: auto;
+}
+.overlay-scroll {
+  flex: 1; overflow-y: auto;
 }
 .search-results li, .fav-list li {
   padding: 14px 16px; border-radius: var(--radius-sm);
@@ -386,12 +389,14 @@ body {
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Search city or town…" autocomplete="off">
   </div>
-  <div class="section-label" id="resultsLabel" style="display:none">Results</div>
-  <ul class="search-results" id="searchResults"></ul>
-  <div class="section-label" id="favsLabel">Favourites</div>
-  <ul class="fav-list" id="favList"></ul>
-  <div style="padding:16px 0; text-align:center;">
-    <button class="icon-btn" id="closeOverlay" style="width:auto;padding:10px 24px;border-radius:var(--radius-sm);font-size:0.9rem;">Close</button>
+  <div class="overlay-scroll">
+    <div class="section-label" id="resultsLabel" style="display:none">Results</div>
+    <ul class="search-results" id="searchResults"></ul>
+    <div class="section-label" id="favsLabel">Favourites</div>
+    <ul class="fav-list" id="favList"></ul>
+    <div style="padding:16px 0; text-align:center;">
+      <button class="icon-btn" id="closeOverlay" style="width:auto;padding:10px 24px;border-radius:var(--radius-sm);font-size:0.9rem;">Close</button>
+    </div>
   </div>
 </div>
 
