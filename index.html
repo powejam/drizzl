@@ -1123,6 +1123,17 @@ function updateFavBtn() {
 }
 
 // ── Overlay (search & favourites) ──
+let _overlayGeoPos = null; // cached device position for result sorting
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function openOverlay() {
   $('#overlay').classList.add('open');
   $('#searchInput').value = '';
@@ -1131,6 +1142,15 @@ function openOverlay() {
   $('#favsLabel').style.display = 'block';
   renderFavList();
   setTimeout(() => $('#searchInput').focus(), 100);
+  // Kick off a background geo fix for proximity sorting; accept a 1-min cached position
+  // so this typically resolves instantly without a fresh GPS acquisition.
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => { _overlayGeoPos = { lat: pos.coords.latitude, lon: pos.coords.longitude }; },
+      () => {}, // permission denied or unavailable — sort falls back to API order
+      { maximumAge: 60000, timeout: 5000, enableHighAccuracy: false }
+    );
+  }
 }
 function closeOverlay() {
   $('#overlay').classList.remove('open');
@@ -1191,6 +1211,12 @@ async function doSearch() {
   list.innerHTML = '<li style="color:var(--text-dim);cursor:default;">Searching…</li>';
   const results = await searchLocation(q);
   if (seq !== _searchSeq) return; // A newer request is in flight — discard this result
+  if (_overlayGeoPos) {
+    results.sort((a, b) =>
+      haversineKm(_overlayGeoPos.lat, _overlayGeoPos.lon, a.latitude, a.longitude) -
+      haversineKm(_overlayGeoPos.lat, _overlayGeoPos.lon, b.latitude, b.longitude)
+    );
+  }
   if (results.length === 0) {
     list.innerHTML = '<li style="color:var(--text-dim);cursor:default;">No results found</li>';
     return;
