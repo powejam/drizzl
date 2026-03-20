@@ -268,6 +268,8 @@ body {
 }
 .daily-row:last-child { border-bottom: none; }
 .daily-day { width: 48px; font-size: 1rem; font-weight: 600; }
+.daily-day-date { font-size: 0.72rem; color: var(--text-dim); font-weight: 400; }
+.card-title-date { font-size: 0.78rem; color: var(--text-dim); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
 .daily-icon { font-size: 1.5rem; width: 36px; text-align: center; }
 .daily-precip { font-size: 0.9rem; color: #b3d4fc; width: 40px; text-align: right; }
 .daily-wind { font-size: 0.85rem; color: var(--text-primary); width: 60px; text-align: right; white-space: nowrap; }
@@ -779,7 +781,7 @@ function render(weather, location) {
   // ── Today's hourly forecast (now → midnight) ──
   const todayEndIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 12;
   html += `<div class="card" style="margin-top:20px;">
-    <div class="card-title">Today</div>
+    <div class="card-title">Today<span class="card-title-date">${new Date(hourlyTimes[startIdx].slice(0,10) + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></div>
     <div class="hourly-scroll">${renderHourChips(startIdx, todayEndIdx, true)}</div>
   </div>`;
 
@@ -787,7 +789,7 @@ function render(weather, location) {
   if (tomorrowMidnightIdx > 0) {
     const tomorrowEndIdx = dayAfterMidnightIdx > tomorrowMidnightIdx ? dayAfterMidnightIdx : tomorrowMidnightIdx + 24;
     html += `<div class="card">
-      <div class="card-title">Tomorrow</div>
+      <div class="card-title">Tomorrow<span class="card-title-date">${new Date(tomorrowDate + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></div>
       <div class="hourly-scroll">${renderHourChips(tomorrowMidnightIdx, tomorrowEndIdx, false)}</div>
     </div>`;
   }
@@ -810,7 +812,7 @@ function render(weather, location) {
     const dWindSpd = fmt(daily.wind_speed_10m_max[i], 0);
     const dWindD = windDir(daily.wind_direction_10m_dominant[i]);
     html += `<div class="daily-row">
-      <span class="daily-day">${dayLabel}</span>
+      <span class="daily-day">${dayLabel}<br><span class="daily-day-date">${new Date(daily.time[i] + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></span>
       <span class="daily-icon">${wmoDailyIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly), precip))}</span>
       <span class="daily-precip">${fmt(precip, 0)}%</span>
       <span class="daily-wind">💨${dWindSpd} ${dWindD}</span>
