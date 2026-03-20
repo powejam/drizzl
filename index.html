@@ -386,10 +386,10 @@ body {
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Search city or town…" autocomplete="off">
   </div>
-  <div class="section-label">Favourites</div>
-  <ul class="fav-list" id="favList"></ul>
   <div class="section-label" id="resultsLabel" style="display:none">Results</div>
   <ul class="search-results" id="searchResults"></ul>
+  <div class="section-label" id="favsLabel">Favourites</div>
+  <ul class="fav-list" id="favList"></ul>
   <div style="padding:16px 0; text-align:center;">
     <button class="icon-btn" id="closeOverlay" style="width:auto;padding:10px 24px;border-radius:var(--radius-sm);font-size:0.9rem;">Close</button>
   </div>
@@ -1128,6 +1128,7 @@ function openOverlay() {
   $('#searchInput').value = '';
   $('#searchResults').innerHTML = '';
   $('#resultsLabel').style.display = 'none';
+  $('#favsLabel').style.display = 'block';
   renderFavList();
   setTimeout(() => $('#searchInput').focus(), 100);
 }
@@ -1181,10 +1182,12 @@ async function doSearch() {
   if (q.length < 2) {
     label.style.display = 'none';
     list.innerHTML = '';
+    $('#favsLabel').style.display = 'block';
     return;
   }
   const seq = ++_searchSeq;
   label.style.display = 'block';
+  $('#favsLabel').style.display = 'none';
   list.innerHTML = '<li style="color:var(--text-dim);cursor:default;">Searching…</li>';
   const results = await searchLocation(q);
   if (seq !== _searchSeq) return; // A newer request is in flight — discard this result
