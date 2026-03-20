@@ -158,11 +158,6 @@ body {
 }
 .search-box input::placeholder { color: var(--text-dim); }
 .search-box input:focus { border-color: var(--accent); }
-.search-box button {
-  padding: 12px 16px; border-radius: var(--radius-sm);
-  border: none; background: var(--accent); color: #fff;
-  font-family: var(--font-body); font-weight: 500; cursor: pointer;
-}
 .search-results, .fav-list {
   list-style: none;
   overflow-y: auto; flex: 1;
@@ -390,7 +385,6 @@ body {
 <div class="overlay" id="overlay">
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Search city or town…" autocomplete="off">
-    <button id="searchBtn">Go</button>
   </div>
   <div class="section-label">Favourites</div>
   <ul class="fav-list" id="favList"></ul>
@@ -1173,18 +1167,31 @@ function renderFavList() {
   });
 }
 
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+}
+
+let _searchSeq = 0;
+
 async function doSearch() {
   const q = $('#searchInput').value.trim();
-  if (!q) return;
-  const results = await searchLocation(q);
   const list = $('#searchResults');
   const label = $('#resultsLabel');
+  if (q.length < 2) {
+    label.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  const seq = ++_searchSeq;
+  label.style.display = 'block';
+  list.innerHTML = '<li style="color:var(--text-dim);cursor:default;">Searching…</li>';
+  const results = await searchLocation(q);
+  if (seq !== _searchSeq) return; // A newer request is in flight — discard this result
   if (results.length === 0) {
-    label.style.display = 'block';
     list.innerHTML = '<li style="color:var(--text-dim);cursor:default;">No results found</li>';
     return;
   }
-  label.style.display = 'block';
   list.innerHTML = results.map((r, i) => `
     <li data-idx="${i}">
       <span style="font-size:1.1rem;">📍</span>
@@ -1250,7 +1257,7 @@ $('#btnSearch').addEventListener('click', openOverlay);
 $('#closeOverlay').addEventListener('click', closeOverlay);
 $('#btnFav').addEventListener('click', toggleFavourite);
 $('#btnGeo').addEventListener('click', useGeolocation);
-$('#searchBtn').addEventListener('click', doSearch);
+$('#searchInput').addEventListener('input', debounce(doSearch, 300));
 $('#searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
 // Close overlay on escape
