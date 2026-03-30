@@ -320,6 +320,21 @@ body {
 .moon-info { flex: 1; }
 .moon-name { font-size: 1.2rem; font-weight: 500; }
 .moon-illum { font-size: 1.05rem; color: var(--text-secondary); }
+.moon-graph {
+  position: relative;
+  width: 100%;
+}
+.moon-graph svg {
+  width: 100%; height: auto;
+  display: block;
+}
+.moon-summary {
+  display: flex; justify-content: center; gap: 24px;
+  padding-top: 14px; margin-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 1.1rem; color: var(--text-secondary);
+}
+.moon-summary span { font-weight: 500; color: var(--text-primary); }
 
 /* ── Wind details ── */
 .wind-details {
@@ -565,6 +580,92 @@ function moonPhase(date) {
   return { fraction, illumination, name };
 }
 
+// ── Moon position (simplified Meeus) ──
+function moonAltitude(date, lat, lon) {
+  const rad = Math.PI / 180;
+  const d = (date.getTime() - Date.UTC(2000, 0, 1, 12)) / 86400000;
+
+  // Moon mean elements (degrees)
+  const L0 = (218.316 + 13.176396 * d) % 360;
+  const M  = (134.963 + 13.064993 * d) % 360;
+  const F  = (93.272  + 13.229350 * d) % 360;
+
+  // Ecliptic longitude (5 largest perturbation terms)
+  const eclLng = (L0 + 6.289 * Math.sin(M * rad)
+                     - 1.274 * Math.sin((2 * L0 - M) * rad)
+                     - 0.658 * Math.sin(2 * L0 * rad)
+                     - 0.214 * Math.sin(2 * M * rad)) * rad;
+  const eclLat = (5.128 * Math.sin(F * rad)) * rad;
+
+  // Obliquity
+  const eps = 23.4393 * rad;
+
+  // Ecliptic → equatorial
+  const sinLng = Math.sin(eclLng), cosLng = Math.cos(eclLng);
+  const sinLat = Math.sin(eclLat), cosLat = Math.cos(eclLat);
+  const ra  = Math.atan2(sinLng * Math.cos(eps) - Math.tan(eclLat) * Math.sin(eps), cosLng);
+  const dec = Math.asin(sinLat * Math.cos(eps) + cosLat * Math.sin(eps) * sinLng);
+
+  // Sidereal time → hour angle
+  const gmst = ((280.16 + 360.9856235 * d) % 360) * rad;
+  const ha   = gmst + lon * rad - ra;
+
+  // Altitude
+  return Math.asin(Math.sin(lat * rad) * Math.sin(dec)
+                 + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
+}
+
+function getMoonTimes(date, lat, lon, tz) {
+  // Scan 36 hours starting from midnight of the given date to find rise/set/transit
+  // Returns { rise: Date|null, set: Date|null, transit: Date|null, transitAlt: number }
+  const midnight = new Date(date);
+  midnight.setHours(0, 0, 0, 0);
+
+  // If we have a timezone, compute midnight in that timezone
+  if (tz) {
+    const localStr = midnight.toLocaleString('en-US', { timeZone: tz });
+    const localMidnight = new Date(localStr);
+    const offset = midnight.getTime() - localMidnight.getTime();
+    midnight.setTime(midnight.getTime() + offset);
+  }
+
+  const step = 5; // minutes — 5min resolution, refine at crossings
+  const totalMinutes = 36 * 60; // scan 36 hours
+  let rise = null, set = null, transit = null;
+  let maxAlt = -Infinity, maxAltTime = null;
+  let prevAlt = moonAltitude(midnight, lat, lon);
+
+  for (let m = step; m <= totalMinutes; m += step) {
+    const t = new Date(midnight.getTime() + m * 60000);
+    const alt = moonAltitude(t, lat, lon);
+
+    if (alt > maxAlt) {
+      maxAlt = alt;
+      maxAltTime = t;
+    }
+
+    // Rising: altitude crosses from negative to positive
+    if (prevAlt <= 0 && alt > 0 && !rise) {
+      // Linear interpolation for more precise time
+      const frac = -prevAlt / (alt - prevAlt);
+      rise = new Date(t.getTime() - step * 60000 * (1 - frac));
+    }
+
+    // Setting: altitude crosses from positive to negative
+    if (prevAlt > 0 && alt <= 0 && !set && rise) {
+      const frac = prevAlt / (prevAlt - alt);
+      set = new Date(t.getTime() - step * 60000 * (1 - frac));
+    }
+
+    prevAlt = alt;
+  }
+
+  // If we found a rise but no set within 36h, moon hasn't set yet
+  // If we found neither, moon may be circumpolar or never rises
+
+  return { rise, set, transit: maxAltTime, transitAlt: maxAlt };
+}
+
 // ── Wind direction ──
 function windDir(deg) {
   const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -688,6 +789,7 @@ function render(weather, location) {
   const _locShift = (weather.utc_offset_seconds * 1000) + (now.getTimezoneOffset() * 60000);
   const times = sunTimes(new Date(now.getTime() + _locShift), location.lat, location.lon);
   const moon = moonPhase(now);
+  const mTimes = getMoonTimes(now, location.lat, location.lon, weather.timezone);
 
   // ── Current conditions ──
   const daily = weather.daily;
@@ -874,6 +976,11 @@ function render(weather, location) {
     <div class="card-title">Sunrise & Sunset</div>
     ${renderDaylightArc(dawnDate, sunriseDate, sunsetDate, duskDate, now, apiSunrise, apiSunset, dawnLabel, noonLabel, duskLabel, tz)}
     ${daylightDuration ? `<div class="daylight-summary"><div>Daylight <span>${daylightDuration}</span></div></div>` : ''}
+  </div>`;
+
+  html += `<div class="card">
+    <div class="card-title">Moonrise & Moonset</div>
+    ${renderMoonArc(mTimes, now, moon, tz, location.lat, location.lon)}
     <div class="moon-row">
       ${renderMoonDisc(moon)}
       <div class="moon-info">
@@ -1099,6 +1206,169 @@ function renderMoonDisc(moon) {
       <path d="${shadowPath}" fill="${darkColor}"/>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
     </svg></div>`;
+}
+
+function renderMoonArc(moonTimes, now, moon, tz, lat, lon) {
+  const { rise, set, transit, transitAlt } = moonTimes;
+
+  // Need at least transit to render something meaningful
+  if (!transit) {
+    return '<div style="text-align:center;color:var(--text-dim);padding:20px;">Moon data unavailable</div>';
+  }
+
+  const W = 400, H = 220;
+  const margin = 16;
+  const graphL = margin, graphR = W - margin, graphW = graphR - graphL;
+  const topY = 46;
+  const bottomY = 155;
+  const labelZone = 185;
+
+  const nowMs = now.getTime();
+  const transitMs = transit.getTime();
+
+  // 24h window centered on transit
+  const halfDay = 12 * 3600000;
+  const tLeft  = transitMs - halfDay;
+  const tRight = transitMs + halfDay;
+
+  function tx(ms) { return graphL + ((ms - tLeft) / (tRight - tLeft)) * graphW; }
+
+  // Compute altitude at regular intervals for the curve
+  // We use actual computed altitudes, not a pure cosine — the moon's motion is irregular
+  const steps = 150;
+  let altitudes = [];
+  let maxAlt = -Infinity, minAlt = Infinity;
+  for (let i = 0; i <= steps; i++) {
+    const ms = tLeft + (tRight - tLeft) * (i / steps);
+    const alt = moonAltitude(new Date(ms), lat, lon);
+    altitudes.push({ ms, alt });
+    if (alt > maxAlt) maxAlt = alt;
+    if (alt < minAlt) minAlt = alt;
+  }
+
+  // Scale altitudes to pixel coordinates
+  // Map maxAlt → topY, minAlt → bottomY
+  const altRange = maxAlt - minAlt || 1;
+  function altToY(alt) {
+    return bottomY - ((alt - minAlt) / altRange) * (bottomY - topY);
+  }
+
+  // Horizon line: altitude = 0
+  const horizonY = altToY(0);
+
+  // Build the curve path
+  let curvePts = altitudes.map(a => ({ x: tx(a.ms), y: altToY(a.alt) }));
+  const curvePath = curvePts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+  ).join(' ');
+
+  // Fill above horizon
+  let abovePts = [];
+  for (const a of altitudes) {
+    if (a.alt > 0) {
+      const x = tx(a.ms), y = altToY(a.alt);
+      abovePts.push({ x, y, ms: a.ms });
+    }
+  }
+  let fillPath = '';
+  if (abovePts.length > 1) {
+    const first = abovePts[0], last = abovePts[abovePts.length - 1];
+    fillPath = abovePts.map((p, i) =>
+      `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+    ).join(' ');
+    fillPath += ` L${last.x.toFixed(1)},${horizonY.toFixed(1)} L${first.x.toFixed(1)},${horizonY.toFixed(1)} Z`;
+  }
+
+  // Above-horizon curve highlight
+  const aboveCurvePath = curvePts.filter(p => p.y < horizonY - 0.5).map((p, i) =>
+    `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+  ).join(' ');
+
+  // Moon marker position — use computed altitude for now
+  const nowAlt = moonAltitude(now, lat, lon);
+  const centreX = Math.max(graphL + 14, Math.min(graphR - 14, tx(nowMs)));
+  const centreY = altToY(nowAlt);
+  const isAboveHorizon = nowAlt > 0;
+
+  // Small inline moon disc as marker (18px diameter)
+  const mr = 9;
+  const f = moon.fraction;
+  const litC = '#e8e8d0', darkC = isAboveHorizon ? '#2a2a3e' : '#1a1a2e';
+  let moonMarker = '';
+  if (f < 0.01 || f > 0.99) {
+    moonMarker = `<circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="${mr}" fill="${darkC}" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>`;
+  } else if (f > 0.49 && f < 0.51) {
+    moonMarker = `
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="${(mr+5)}" fill="rgba(232,232,208,0.15)"/>
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="${mr}" fill="${litC}"/>`;
+  } else {
+    let tRx;
+    if (f <= 0.5) tRx = Math.abs(1 - f * 4) * mr;
+    else tRx = Math.abs(1 - (f - 0.5) * 4) * mr;
+    const mcx = centreX.toFixed(1), mcy = centreY.toFixed(1);
+    let shadowPath;
+    if (f < 0.25) shadowPath = `M${mcx},${mcy-mr} A${mr},${mr} 0 0,0 ${mcx},${+mcy+mr} A${tRx.toFixed(1)},${mr} 0 0,0 ${mcx},${mcy-mr}`;
+    else if (f < 0.5) shadowPath = `M${mcx},${mcy-mr} A${mr},${mr} 0 0,0 ${mcx},${+mcy+mr} A${tRx.toFixed(1)},${mr} 0 0,1 ${mcx},${mcy-mr}`;
+    else if (f < 0.75) shadowPath = `M${mcx},${mcy-mr} A${mr},${mr} 0 0,1 ${mcx},${+mcy+mr} A${tRx.toFixed(1)},${mr} 0 0,0 ${mcx},${mcy-mr}`;
+    else shadowPath = `M${mcx},${mcy-mr} A${mr},${mr} 0 0,1 ${mcx},${+mcy+mr} A${tRx.toFixed(1)},${mr} 0 0,1 ${mcx},${mcy-mr}`;
+
+    moonMarker = `
+      ${isAboveHorizon ? `<circle cx="${mcx}" cy="${mcy}" r="${(mr+5)}" fill="rgba(232,232,208,0.12)"/>` : ''}
+      <circle cx="${mcx}" cy="${mcy}" r="${mr}" fill="${litC}"/>
+      <path d="${shadowPath}" fill="${darkC}"/>
+      <circle cx="${mcx}" cy="${mcy}" r="${mr}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>`;
+  }
+
+  // Labels
+  const riseMs = rise ? rise.getTime() : null;
+  const setMs  = set  ? set.getTime()  : null;
+  const inView = (ms) => ms !== null && ms >= tLeft && ms <= tRight;
+  function clampX(x) { return Math.max(graphL + 20, Math.min(graphR - 20, x)); }
+
+  const riseLabel = rise ? fmtTime(rise, tz) : null;
+  const setLabel  = set  ? fmtTime(set, tz)  : null;
+  const transitLabel = fmtTime(transit, tz);
+
+  const xRise    = riseMs ? tx(riseMs) : 0;
+  const xSet     = setMs  ? tx(setMs)  : 0;
+  const xTransit = tx(transitMs);
+
+  return `<div class="moon-graph"><svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="moonGlow">
+        <stop offset="0%" stop-color="#e8e8d0" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#e8e8d0" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="moonFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#94a3b8" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.1"/>
+      </linearGradient>
+    </defs>
+
+    ${inView(riseMs) ? `
+      <text x="${clampX(xRise).toFixed(1)}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="17" font-family="var(--font-body)">Moonrise</text>
+      <text x="${clampX(xRise).toFixed(1)}" y="40" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${riseLabel}</text>
+    ` : ''}
+
+    ${inView(setMs) ? `
+      <text x="${clampX(xSet).toFixed(1)}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="17" font-family="var(--font-body)">Moonset</text>
+      <text x="${clampX(xSet).toFixed(1)}" y="40" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${setLabel}</text>
+    ` : ''}
+
+    ${fillPath ? `<path d="${fillPath}" fill="url(#moonFill)" />` : ''}
+
+    ${horizonY >= topY && horizonY <= bottomY ? `<line x1="${graphL}" y1="${horizonY.toFixed(1)}" x2="${graphR}" y2="${horizonY.toFixed(1)}" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="6,4" />` : ''}
+
+    <path d="${curvePath}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="3" />
+    ${aboveCurvePath ? `<path d="${aboveCurvePath}" fill="none" stroke="rgba(148,163,184,0.85)" stroke-width="3.5" />` : ''}
+
+    ${moonMarker}
+
+    ${inView(transitMs) ? `
+      <text x="${clampX(xTransit).toFixed(1)}" y="${labelZone - 8}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="16" font-family="var(--font-body)">Transit</text>
+      <text x="${clampX(xTransit).toFixed(1)}" y="${labelZone + 12}" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="18" font-weight="500" font-family="var(--font-display)">${transitLabel}</text>
+    ` : ''}
+  </svg></div>`;
 }
 
 function isDay(weather, now) {
