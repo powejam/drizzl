@@ -474,14 +474,17 @@ function wmoIcon(code, isNight) {
 }
 function wmoDailyIcon(code) { return (WMO[code] || WMO[0])[1]; }
 
-// Return the most representative daytime weather code for a given date string
+// Return the most representative weather code for a given date string
 // by finding the modal hourly code during is_day hours.
-// Falls back to the supplied daily code if no daytime hours are found.
-function representativeDailyCode(dateStr, fallbackCode, hourly) {
+// Falls back to the supplied daily code if no matching hours are found.
+// When fromIdx is provided (for "today"), only hours from that index onwards
+// are considered and is_day filtering is skipped (we show what's left, not what was).
+function representativeDailyCode(dateStr, fallbackCode, hourly, fromIdx) {
   const freq = {};
-  for (let i = 0; i < hourly.time.length; i++) {
+  const start = fromIdx != null ? fromIdx : 0;
+  for (let i = start; i < hourly.time.length; i++) {
     if (!hourly.time[i].startsWith(dateStr)) continue;
-    if (hourly.is_day[i] !== 1) continue;
+    if (fromIdx == null && hourly.is_day[i] !== 1) continue;
     const code = hourly.weather_code[i];
     freq[code] = (freq[code] || 0) + 1;
   }
@@ -815,7 +818,9 @@ function render(weather, location) {
     const dWindD = windDir(daily.wind_direction_10m_dominant[i]);
     html += `<div class="daily-row">
       <span class="daily-day">${dayLabel}<br><span class="daily-day-date">${new Date(daily.time[i] + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></span>
-      <span class="daily-icon">${wmoDailyIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly), precip))}</span>
+      <span class="daily-icon">${i === 0
+        ? wmoIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly, startIdx), precip), isNight)
+        : wmoDailyIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly), precip))}</span>
       <span class="daily-precip">${fmt(precip, 0)}%</span>
       <span class="daily-wind">💨${dWindSpd} ${dWindD}</span>
       <div class="daily-bar-wrap">
