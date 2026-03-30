@@ -89,18 +89,16 @@ body {
   position: fixed; inset: 0; z-index: 0;
   transition: background 1.5s ease;
 }
-.atmos-day    { background: linear-gradient(170deg, #2563eb 0%, #60a5fa 40%, #93c5fd 100%); }
+body { transition: background 1.5s ease; }
+/* Card/chip overrides for light-background periods */
 .atmos-day .card { --bg-card: rgba(0,0,0,0.3); }
 .atmos-day .current-details span { background: rgba(0,0,0,0.3); }
 .atmos-day .hour-chip { background: rgba(0,0,0,0.2); }
 .atmos-day .hour-chip.now { background: rgba(0,0,0,0.35); }
-.atmos-night  { background: linear-gradient(170deg, #0f172a 0%, #1e1b4b 50%, #1a1a2e 100%); }
-.atmos-dawn   { background: linear-gradient(170deg, #1e3a5f 0%, #d97706 40%, #fbbf24 100%); }
 .atmos-dawn .card { --bg-card: rgba(0,0,0,0.3); }
 .atmos-dawn .current-details span { background: rgba(0,0,0,0.3); }
-.atmos-dusk   { background: linear-gradient(170deg, #4c1d95 0%, #dc2626 35%, #f59e0b 100%); }
-.atmos-overcast { background: linear-gradient(170deg, #475569 0%, #64748b 50%, #94a3b8 100%); }
 .atmos-overcast .card { --bg-card: rgba(0,0,0,0.45); }
+/* Rain/snow keep fixed gradients */
 .atmos-rain   { background: linear-gradient(170deg, #1e293b 0%, #334155 50%, #475569 100%); }
 .atmos-snow   { background: linear-gradient(170deg, #cbd5e1 0%, #e2e8f0 50%, #f1f5f9 100%); }
 .atmos-snow .card { --bg-card: rgba(0,0,0,0.3); }
@@ -672,7 +670,33 @@ function fmtTime(date, tz) {
 }
 
 // ── Atmosphere background ──
-function updateAtmosphere(weatherCode, lat, lon) {
+function tempToHue(temp) {
+  // Piecewise linear: cold blue → hot red
+  const pts = [[-10,230],[0,210],[15,170],[25,40],[35,15],[40,0]];
+  const t = Math.max(-10, Math.min(40, temp));
+  for (let i = 1; i < pts.length; i++) {
+    if (t <= pts[i][0]) {
+      const [t0,h0] = pts[i-1], [t1,h1] = pts[i];
+      return Math.round(h0 + (t - t0) / (t1 - t0) * (h1 - h0));
+    }
+  }
+  return pts[pts.length-1][1];
+}
+
+function tempGradient(temp, period) {
+  const h = tempToHue(temp);
+  let sat, lit, ds, dl;
+  switch (period) {
+    case 'night':   sat=18; lit=14; ds=5;  dl=4;  break;
+    case 'dawn':    sat=48; lit=32; ds=10; dl=8;  break;
+    case 'dusk':    sat=42; lit=28; ds=10; dl=8;  break;
+    case 'overcast':sat=25; lit=30; ds=8;  dl=6;  break;
+    default:        sat=58; lit=38; ds=10; dl=10; break; // day
+  }
+  return `linear-gradient(170deg, hsl(${h},${sat+ds}%,${lit-dl}%) 0%, hsl(${h},${sat}%,${lit}%) 50%, hsl(${(h+10)%360},${sat-ds}%,${lit+dl}%) 100%)`;
+}
+
+function updateAtmosphere(weatherCode, lat, lon, temperature) {
   const atmos = $('#atmosphere');
   const now = new Date();
   const times = sunTimes(now, lat, lon);
@@ -692,14 +716,28 @@ function updateAtmosphere(weatherCode, lat, lon) {
     else period = 'day';
   }
 
-  // Override for weather
-  let cls = `atmos-${period}`;
-  if ([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(weatherCode)) cls = 'atmos-rain';
-  else if ([71,73,75,77,85,86].includes(weatherCode)) cls = 'atmos-snow';
-  else if (weatherCode === 3 && period === 'day') cls = 'atmos-overcast';
+  // Rain/snow: fixed gradients via CSS class, clear inline style
+  const rainCodes = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99];
+  const snowCodes = [71,73,75,77,85,86];
+  let cls, useTemp = true;
+
+  if (rainCodes.includes(weatherCode))        { cls = 'atmos-rain'; useTemp = false; }
+  else if (snowCodes.includes(weatherCode))    { cls = 'atmos-snow'; useTemp = false; }
+  else if (weatherCode === 3 && period === 'day') { cls = 'atmos-overcast'; }
+  else                                         { cls = `atmos-${period}`; }
 
   atmos.className = cls;
   document.body.className = cls;
+
+  if (useTemp) {
+    const gradPeriod = (cls === 'atmos-overcast') ? 'overcast' : period;
+    const bg = tempGradient(temperature, gradPeriod);
+    atmos.style.background = bg;
+    document.body.style.background = bg;
+  } else {
+    atmos.style.background = '';
+    document.body.style.background = '';
+  }
 }
 
 // ── Fetch weather from Open-Meteo ──
@@ -770,7 +808,7 @@ function render(weather, location) {
   const now = new Date();
   const isNight = !isDay(weather, now);
 
-  updateAtmosphere(c.weather_code, location.lat, location.lon);
+  updateAtmosphere(c.weather_code, location.lat, location.lon, c.temperature_2m);
   updateFavBtn();
 
   // Shift 'now' so its local getters return the location's current date (not the browser's).
