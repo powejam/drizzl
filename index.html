@@ -616,52 +616,42 @@ function moonAltitude(date, lat, lon) {
 }
 
 function getMoonTimes(date, lat, lon, tz) {
-  // Scan 36 hours starting from midnight of the given date to find rise/set/transit
-  // Returns { rise: Date|null, set: Date|null, transit: Date|null, transitAlt: number }
-  const midnight = new Date(date);
-  midnight.setHours(0, 0, 0, 0);
+  // Scan ±14h around 'now' to find the nearest transit, then rise/set around it
+  const nowMs = date.getTime();
+  const scanStart = nowMs - 14 * 3600000;
+  const scanEnd   = nowMs + 14 * 3600000;
+  const step = 5; // minutes
 
-  // If we have a timezone, compute midnight in that timezone
-  if (tz) {
-    const localStr = midnight.toLocaleString('en-US', { timeZone: tz });
-    const localMidnight = new Date(localStr);
-    const offset = midnight.getTime() - localMidnight.getTime();
-    midnight.setTime(midnight.getTime() + offset);
-  }
-
-  const step = 5; // minutes — 5min resolution, refine at crossings
-  const totalMinutes = 36 * 60; // scan 36 hours
-  let rise = null, set = null, transit = null;
+  // Pass 1: find all zero-crossings and the global max (transit)
+  let crossings = []; // { time, type: 'rise'|'set' }
   let maxAlt = -Infinity, maxAltTime = null;
-  let prevAlt = moonAltitude(midnight, lat, lon);
+  let prevAlt = moonAltitude(new Date(scanStart), lat, lon);
 
-  for (let m = step; m <= totalMinutes; m += step) {
-    const t = new Date(midnight.getTime() + m * 60000);
+  for (let ms = scanStart + step * 60000; ms <= scanEnd; ms += step * 60000) {
+    const t = new Date(ms);
     const alt = moonAltitude(t, lat, lon);
 
-    if (alt > maxAlt) {
-      maxAlt = alt;
-      maxAltTime = t;
-    }
+    if (alt > maxAlt) { maxAlt = alt; maxAltTime = t; }
 
-    // Rising: altitude crosses from negative to positive
-    if (prevAlt <= 0 && alt > 0 && !rise) {
-      // Linear interpolation for more precise time
+    if (prevAlt <= 0 && alt > 0) {
       const frac = -prevAlt / (alt - prevAlt);
-      rise = new Date(t.getTime() - step * 60000 * (1 - frac));
-    }
-
-    // Setting: altitude crosses from positive to negative
-    if (prevAlt > 0 && alt <= 0 && !set && rise) {
+      crossings.push({ time: new Date(ms - step * 60000 * (1 - frac)), type: 'rise' });
+    } else if (prevAlt > 0 && alt <= 0) {
       const frac = prevAlt / (prevAlt - alt);
-      set = new Date(t.getTime() - step * 60000 * (1 - frac));
+      crossings.push({ time: new Date(ms - step * 60000 * (1 - frac)), type: 'set' });
     }
-
     prevAlt = alt;
   }
 
-  // If we found a rise but no set within 36h, moon hasn't set yet
-  // If we found neither, moon may be circumpolar or never rises
+  // Pass 2: pick the rise/set pair that brackets the transit
+  const transitMs = maxAltTime ? maxAltTime.getTime() : nowMs;
+  let rise = null, set = null;
+  for (const c of crossings) {
+    if (c.type === 'rise' && c.time.getTime() <= transitMs) rise = c.time;
+  }
+  for (const c of crossings) {
+    if (c.type === 'set' && c.time.getTime() >= transitMs) { set = c.time; break; }
+  }
 
   return { rise, set, transit: maxAltTime, transitAlt: maxAlt };
 }
