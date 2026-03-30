@@ -415,6 +415,9 @@ let state = {
   weather: null,
 };
 
+const STALE_MS = 60 * 60 * 1000; // 1 hour
+let lastFetchTime = 0;
+
 // ── LocalStorage ──
 function loadState() {
   try {
@@ -1257,6 +1260,7 @@ async function loadWeather() {
   main.innerHTML = '<div class="loading"><div class="spinner"></div><div class="loading-text">Fetching weather…</div></div>';
   try {
     const weather = await fetchWeather(loc.lat, loc.lon);
+    lastFetchTime = Date.now();
     render(weather, loc);
   } catch (err) {
     main.innerHTML = `<div class="error-msg">
@@ -1323,6 +1327,31 @@ if (state.activeLocation && !state.activeLocation.isGeo) {
     }
   })();
 }
+
+// ── Auto-refresh ──
+async function refreshWeather() {
+  const loc = state.activeLocation;
+  if (!loc) return;
+  try {
+    const weather = await fetchWeather(loc.lat, loc.lon);
+    lastFetchTime = Date.now();
+    render(weather, loc);
+  } catch (e) {
+    // Silent fail — stale data beats an error screen
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - lastFetchTime > STALE_MS) {
+    refreshWeather();
+  }
+});
+
+setInterval(() => {
+  if (document.visibilityState === 'visible' && Date.now() - lastFetchTime > STALE_MS) {
+    refreshWeather();
+  }
+}, STALE_MS);
 
 // ── Service Worker ──
 try {
