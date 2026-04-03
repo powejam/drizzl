@@ -746,7 +746,7 @@ async function fetchWeather(lat, lon) {
     latitude: lat,
     longitude: lon,
     current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,cloud_cover',
-    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day',
+    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day,uv_index',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max',
     timezone: 'auto',
     forecast_days: 10,
@@ -819,6 +819,26 @@ function render(weather, location) {
   const moon = moonPhase(now);
   const mTimes = getMoonTimes(now, location.lat, location.lon, weather.timezone);
 
+  // ── Hourly index computation (needed by both summary and forecasts) ──
+  const hourlyTimes = weather.hourly.time;
+  const nowISO = now.toISOString().slice(0, 13);
+  let startIdx = hourlyTimes.findIndex(t => t.startsWith(nowISO));
+  if (startIdx < 0) startIdx = 0;
+  const todayDate = hourlyTimes[startIdx].slice(0, 10);
+  let tomorrowDate = null;
+  for (let i = startIdx; i < hourlyTimes.length; i++) {
+    const d = hourlyTimes[i].slice(0, 10);
+    if (d !== todayDate) { tomorrowDate = d; break; }
+  }
+  const tomorrowMidnightIdx = tomorrowDate
+    ? hourlyTimes.indexOf(tomorrowDate + 'T00:00')
+    : -1;
+  const todayEndHourIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 24;
+
+  // Remaining-hours UV max for today summary
+  const remUV = weather.hourly.uv_index.slice(startIdx, todayEndHourIdx);
+  const uvMax = remUV.length > 0 ? Math.max(...remUV) : daily.uv_index_max[0];
+
   // ── Current conditions ──
   const daily = weather.daily;
   let html = `<div class="fade-in">`;
@@ -848,30 +868,10 @@ function render(weather, location) {
     <span>🔽 ${fmt(c.surface_pressure, 0)} hPa</span>
     <span>☁️ ${fmt(c.cloud_cover, 0)}%</span>
     <span>☔ ${fmt(c.precipitation, 1)} mm</span>
-    <span>☀️ UV ${fmt(daily.uv_index_max[0], 0)}</span>
+    <span>☀️ UV ${fmt(uvMax, 0)}</span>
   </div>`;
 
   // ── Hourly forecast helpers ──
-  const hourlyTimes = weather.hourly.time;
-  // Find current hour index
-  const nowISO = now.toISOString().slice(0, 13);
-  let startIdx = hourlyTimes.findIndex(t => t.startsWith(nowISO));
-  if (startIdx < 0) startIdx = 0;
-
-  // Find midnight boundaries
-  // Open-Meteo hourly times are in location timezone, e.g. "2026-03-14T08:00"
-  const todayDate = hourlyTimes[startIdx].slice(0, 10); // e.g. "2026-03-14"
-
-  // Compute tomorrow's date string by finding the next distinct date in the data
-  let tomorrowDate = null;
-  for (let i = startIdx; i < hourlyTimes.length; i++) {
-    const d = hourlyTimes[i].slice(0, 10);
-    if (d !== todayDate) { tomorrowDate = d; break; }
-  }
-
-  const tomorrowMidnightIdx = tomorrowDate
-    ? hourlyTimes.indexOf(tomorrowDate + 'T00:00')
-    : -1;
 
   // Day after tomorrow
   let dayAfterDate = null;
@@ -943,17 +943,26 @@ function render(weather, location) {
     const hi = daily.temperature_2m_max[i];
     const left = ((lo - allMin) / range) * 100;
     const width = ((hi - lo) / range) * 100;
-    // For today, use max PoP from remaining hours only (not the all-day API max which includes past hours)
+    // For today, use max from remaining hours only (not all-day API aggregates)
     let precip;
     if (i === 0) {
-      const endIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 24;
-      const remaining = weather.hourly.precipitation_probability.slice(startIdx, endIdx);
+      const remaining = weather.hourly.precipitation_probability.slice(startIdx, todayEndHourIdx);
       precip = remaining.length > 0 ? Math.max(...remaining) : daily.precipitation_probability_max[0];
     } else {
       precip = daily.precipitation_probability_max[i];
     }
-    const dWindSpd = fmt(daily.wind_speed_10m_max[i], 0);
-    const dWindD = windDir(daily.wind_direction_10m_dominant[i]);
+    let dWindSpd, dWindD;
+    if (i === 0) {
+      const remWind = weather.hourly.wind_speed_10m.slice(startIdx, todayEndHourIdx);
+      const remDir = weather.hourly.wind_direction_10m.slice(startIdx, todayEndHourIdx);
+      const maxWind = remWind.length > 0 ? Math.max(...remWind) : daily.wind_speed_10m_max[0];
+      const maxIdx = remWind.indexOf(maxWind);
+      dWindSpd = fmt(maxWind, 0);
+      dWindD = windDir(maxIdx >= 0 ? remDir[maxIdx] : daily.wind_direction_10m_dominant[0]);
+    } else {
+      dWindSpd = fmt(daily.wind_speed_10m_max[i], 0);
+      dWindD = windDir(daily.wind_direction_10m_dominant[i]);
+    }
     html += `<div class="daily-row">
       <span class="daily-day">${dayLabel}<br><span class="daily-day-date">${new Date(daily.time[i] + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></span>
       <span class="daily-icon">${i === 0
