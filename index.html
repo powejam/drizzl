@@ -865,11 +865,11 @@ function render(weather, location) {
   html += `<div class="current-desc">${wmoDesc(c.weather_code)}</div>`;
   html += `<div class="current-details">
     <span>🌡️ Feels ${fmt(c.apparent_temperature, 0)}°</span>
+    <span>☔ Rain ${fmt(popMax, 0)}%</span>
+    <span>☁️ Cloud ${fmt(c.cloud_cover, 0)}%</span>
     <span>💧 Humidity ${fmt(c.relative_humidity_2m, 0)}%</span>
     <span>💨 ${fmt(c.wind_speed_10m, 0)} km/h ${windDir(c.wind_direction_10m)}</span>
     <span>🔽 ${fmt(c.surface_pressure, 0)} hPa</span>
-    <span>☁️ Cloud ${fmt(c.cloud_cover, 0)}%</span>
-    <span>☔ Rain ${fmt(popMax, 0)}%</span>
     <span>☀️ UV ${fmt(uvMax, 0)}</span>
   </div>`;
 
