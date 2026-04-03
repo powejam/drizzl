@@ -943,7 +943,15 @@ function render(weather, location) {
     const hi = daily.temperature_2m_max[i];
     const left = ((lo - allMin) / range) * 100;
     const width = ((hi - lo) / range) * 100;
-    const precip = daily.precipitation_probability_max[i];
+    // For today, use max PoP from remaining hours only (not the all-day API max which includes past hours)
+    let precip;
+    if (i === 0) {
+      const endIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 24;
+      const remaining = weather.hourly.precipitation_probability.slice(startIdx, endIdx);
+      precip = remaining.length > 0 ? Math.max(...remaining) : daily.precipitation_probability_max[0];
+    } else {
+      precip = daily.precipitation_probability_max[i];
+    }
     const dWindSpd = fmt(daily.wind_speed_10m_max[i], 0);
     const dWindD = windDir(daily.wind_direction_10m_dominant[i]);
     html += `<div class="daily-row">
