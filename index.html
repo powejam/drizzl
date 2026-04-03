@@ -835,9 +835,11 @@ function render(weather, location) {
     : -1;
   const todayEndHourIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 24;
 
-  // Remaining-hours UV max for today summary
+  // Remaining-hours aggregates for today summary
   const remUV = weather.hourly.uv_index.slice(startIdx, todayEndHourIdx);
   const uvMax = remUV.length > 0 ? Math.max(...remUV) : daily.uv_index_max[0];
+  const remPoP = weather.hourly.precipitation_probability.slice(startIdx, todayEndHourIdx);
+  const popMax = remPoP.length > 0 ? Math.max(...remPoP) : daily.precipitation_probability_max[0];
 
   // ── Current conditions ──
   const daily = weather.daily;
@@ -867,7 +869,7 @@ function render(weather, location) {
     <span>💨 ${fmt(c.wind_speed_10m, 0)} km/h ${windDir(c.wind_direction_10m)}</span>
     <span>🔽 ${fmt(c.surface_pressure, 0)} hPa</span>
     <span>☁️ ${fmt(c.cloud_cover, 0)}%</span>
-    <span>☔ ${fmt(c.precipitation, 1)} mm</span>
+    <span>☔ ${fmt(popMax, 0)}%</span>
     <span>☀️ UV ${fmt(uvMax, 0)}</span>
   </div>`;
 
