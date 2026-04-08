@@ -1131,8 +1131,9 @@ function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunse
       <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="4" fill="#fef3c7" />`;
   } else {
     marker = `
-      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="7" fill="#e2e8f0" />
-      <circle cx="${(centreX + 3).toFixed(1)}" cy="${(centreY - 2).toFixed(1)}" r="5.5" fill="rgba(0,0,0,0.85)" />`;
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="14" fill="url(#sunGlow)" opacity="0.35" />
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="9" fill="#78716c" stroke="#57534e" stroke-width="2" opacity="0.6" />
+      <circle cx="${centreX.toFixed(1)}" cy="${centreY.toFixed(1)}" r="4" fill="#a8a29e" opacity="0.6" />`;
   }
 
   // ── Label positions ──
