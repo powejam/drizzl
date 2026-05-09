@@ -136,11 +136,11 @@ body { transition: background 1.5s ease; }
 .icon-btn:hover { background: var(--bg-card-hover); }
 .icon-btn.active { background: rgba(96,165,250,0.3); }
 
-/* ── Weather avatar (top-right) ── */
+/* ── Weather avatar (anchored to top of current-location) ── */
 .weather-avatar {
   position: absolute;
-  top: calc(var(--safe-top) + 72px);
-  right: 16px;
+  top: 0;
+  right: 0;
   width: 120px;
   text-align: center;
   z-index: 5;
@@ -243,6 +243,7 @@ body { transition: background 1.5s ease; }
 
 /* ── Current conditions ── */
 .current-location {
+  position: relative;
   font-family: var(--font-display);
   font-size: 1.5rem; font-weight: 700;
   margin-bottom: 2px; letter-spacing: -0.02em;
@@ -473,7 +474,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v68';
+const APP_VERSION = 'v69';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -1990,11 +1991,10 @@ function render(weather, location) {
   const _avPick = pickAvatar(_avConditions, avatarSeed(_avConditions)).chosen;
 
   let html = `<div class="fade-in">`;
-  html += `<div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.n)}">
+  html += `<div class="current-location">${esc(location.name)}<div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.n)}">
     <div class="avatar-circle">${_avPick.e}</div>
     <div class="avatar-name">${esc(_avPick.display)}</div>
-  </div>`;
-  html += `<div class="current-location">${esc(location.name)}</div>`;
+  </div></div>`;
   if (location.region || location.country) {
     html += `<div class="current-region">${esc([location.region, location.country].filter(Boolean).join(', '))}</div>`;
   }
