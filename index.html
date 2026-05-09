@@ -476,7 +476,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v62';
+const APP_VERSION = 'v63';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -697,7 +697,7 @@ const AVATARS = [
       if(c.temp>8) s+=10;
       return s;
     }},
-  { e:'🐥', n:'Curious Chick', why:'A bright spring afternoon',
+  { e:'🐥', n:'Curious Chick', why:'A bright afternoon',
     fits:c=>{
       if(c.season!=='spring' && c.season!=='summer') return 0;
       if(!['midday','afternoon'].includes(c.time)) return 0;
@@ -723,7 +723,7 @@ const AVATARS = [
       if(['snow','heavy-snow','clear'].includes(c.weather)) s+=15;
       return s;
     }},
-  { e:'🦊', n:'Fox', why:'A twilight prowler in autumn',
+  { e:'🦊', n:'Fox', why:'A twilight prowler',
     fits:c=>{
       let s=0;
       if(c.time==='dusk') s+=50;
@@ -735,7 +735,7 @@ const AVATARS = [
       if(['clear','partly-cloudy','fog','overcast'].includes(c.weather)) s+=10;
       return s;
     }},
-  { e:'🐻', n:'Bear', why:'Through the autumn woods',
+  { e:'🐻', n:'Bear', why:'Through the woods',
     fits:c=>{
       if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
       let s=0;
@@ -995,7 +995,7 @@ const AVATARS = [
       if(['morning','midday','afternoon'].includes(c.time)) s+=10;
       return s;
     }},
-  { e:'🐇', n:'Hare', why:'A spring morning runner',
+  { e:'🐇', n:'Hare', why:'A morning runner',
     fits:c=>{
       let s=0;
       if(['dawn','morning'].includes(c.time)) s+=40;
@@ -1008,7 +1008,7 @@ const AVATARS = [
       if(['heavy-rain','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
       return Math.max(0,s);
     }},
-  { e:'🐰', n:'Bunny', why:'A bright spring morning',
+  { e:'🐰', n:'Bunny', why:'A bright morning',
     fits:c=>{
       if(!['dawn','morning','midday'].includes(c.time)) return 0;
       if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
@@ -1018,7 +1018,7 @@ const AVATARS = [
       if(s===0) return 0;
       return s;
     }},
-  { e:'🦔', n:'Hedgehog', why:'Snuffling through autumn evenings',
+  { e:'🦔', n:'Hedgehog', why:'Snuffling through the evening',
     fits:c=>{
       if(!['dusk','night'].includes(c.time)) return 0;
       let s=40;
@@ -1029,7 +1029,7 @@ const AVATARS = [
       if(c.temp<2) s-=20;
       return Math.max(0,s);
     }},
-  { e:'🐿️', n:'Squirrel', why:'Storing autumn’s harvest',
+  { e:'🐿️', n:'Squirrel', why:'Quick among the branches',
     fits:c=>{
       if(!['morning','midday','afternoon'].includes(c.time)) return 0;
       let s=30;
@@ -1059,7 +1059,7 @@ const AVATARS = [
       if(c.season!=='winter') s+=5;
       return s;
     }},
-  { e:'🦡', n:'Badger', why:'Autumn dusk under leaves',
+  { e:'🦡', n:'Badger', why:'Dusk under the leaves',
     fits:c=>{
       if(!['dusk','night','dawn'].includes(c.time)) return 0;
       let s=0;
@@ -1127,7 +1127,7 @@ const AVATARS = [
       if(c.temp>2 && c.temp<25) s+=8;
       return s;
     }},
-  { e:'🦇', n:'Bat', why:'A summer dusk hunter',
+  { e:'🦇', n:'Bat', why:'A dusk hunter',
     fits:c=>{
       if(!['dusk','night'].includes(c.time)) return 0;
       if(['rain','heavy-rain','snow','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
@@ -1336,7 +1336,7 @@ const AVATARS = [
       if(c.temp<2) s-=30;
       return Math.max(0,s);
     }},
-  { e:'🦋', n:'Butterfly', why:'A drift of summer',
+  { e:'🦋', n:'Butterfly', why:'A drift of warmth',
     fits:c=>{
       if(!['morning','midday','afternoon'].includes(c.time)) return 0;
       if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
@@ -1367,7 +1367,7 @@ const AVATARS = [
       if(c.temp<12) s-=30;
       return Math.max(0,s);
     }},
-  { e:'🐛', n:'Caterpillar', why:'New spring leaves',
+  { e:'🐛', n:'Caterpillar', why:'Among new leaves',
     fits:c=>{
       if(!['morning','midday','afternoon'].includes(c.time)) return 0;
       if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
@@ -1386,7 +1386,7 @@ const AVATARS = [
       if(c.season==='spring') s+=15; else if(c.season==='summer') s+=10;
       return s;
     }},
-  { e:'🪲', n:'Beetle', why:'A warm summer hum',
+  { e:'🪲', n:'Beetle', why:'A warm hum in the air',
     fits:c=>{
       if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
       if(['heavy-rain','heavy-snow','thunderstorm','snow'].includes(c.weather)) return 0;
@@ -1442,7 +1442,7 @@ const AVATARS = [
       if(c.weather==='partly-cloudy') s+=10;
       return s;
     }},
-  { e:'👻', n:'Ghost', why:'A foggy autumn night',
+  { e:'👻', n:'Ghost', why:'Drifting through the fog',
     fits:c=>{
       if(c.time!=='night' && c.time!=='dusk') return 0;
       if(c.weather!=='fog') return 0;
@@ -1458,7 +1458,7 @@ const AVATARS = [
       if(c.weather==='fog') s+=8;
       return s;
     }},
-  { e:'🧚', n:'Fairy', why:'A summer twilight',
+  { e:'🧚', n:'Fairy', why:'A warm twilight',
     fits:c=>{
       if(!['dusk','night'].includes(c.time)) return 0;
       if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
