@@ -473,7 +473,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v67';
+const APP_VERSION = 'v68';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -1927,7 +1927,11 @@ function render(weather, location) {
 
   // ── Hourly index computation (needed by both summary and forecasts) ──
   const hourlyTimes = weather.hourly.time;
-  const nowISO = now.toISOString().slice(0, 13);
+  // hourly.time strings are location-local (timezone=auto, no TZ marker), so
+  // compare against now adjusted to location-local. Note: this uses just the
+  // location's UTC offset (NOT the existing _locShift, which targets local
+  // getDate/getHours getters, not toISOString output).
+  const nowISO = new Date(now.getTime() + weather.utc_offset_seconds * 1000).toISOString().slice(0, 13);
   let startIdx = hourlyTimes.findIndex(t => t.startsWith(nowISO));
   if (startIdx < 0) startIdx = 0;
   const todayDate = hourlyTimes[startIdx].slice(0, 10);
@@ -2593,10 +2597,17 @@ function renderMoonArc(moonTimes, now, moon, tz, lat, lon) {
 
 function isDay(weather, now) {
   const hourlyTimes = weather.hourly.time;
-  const nowISO = now.toISOString().slice(0, 13);
+  // Open-Meteo with timezone=auto returns hourly times as bare location-local
+  // strings (no TZ marker). To match them via toISOString().slice we need to
+  // shift `now` by just the location's UTC offset — the formatted UTC string
+  // then reads as location-local time.
+  const localMs = now.getTime() + weather.utc_offset_seconds * 1000;
+  const localAsUTC = new Date(localMs);
+  const nowISO = localAsUTC.toISOString().slice(0, 13);
   const idx = hourlyTimes.findIndex(t => t.startsWith(nowISO));
   if (idx >= 0) return weather.hourly.is_day[idx] === 1;
-  return now.getHours() > 6 && now.getHours() < 20;
+  const hour = localAsUTC.getUTCHours();
+  return hour > 6 && hour < 20;
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
