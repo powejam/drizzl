@@ -139,9 +139,9 @@ body { transition: background 1.5s ease; }
 /* ── Weather avatar (top-right) ── */
 .weather-avatar {
   position: absolute;
-  top: calc(var(--safe-top) + 60px);
+  top: calc(var(--safe-top) + 90px);
   right: 16px;
-  width: 68px;
+  width: 120px;
   text-align: center;
   z-index: 5;
   pointer-events: none;
@@ -162,17 +162,22 @@ body { transition: background 1.5s ease; }
   box-shadow: 0 4px 14px -6px rgba(0,0,0,0.35);
 }
 .avatar-name {
-  font-size: 0.7rem;
-  font-weight: 600;
-  margin-top: 5px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-style: italic;
+  margin-top: 6px;
+  letter-spacing: 0.01em;
   color: var(--text-secondary);
-  line-height: 1.1;
+  line-height: 1.25;
+  /* Clamp to two lines for very long phrases. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-/* Reserve right-edge space so long location names don't slide under the avatar. */
+/* Reserve right-edge space so the location text doesn't slide under the avatar. */
 .current-location, .current-region, .current-localtime {
-  padding-right: 80px;
+  padding-right: 120px;
 }
 
 /* ── Location search overlay ── */
@@ -471,7 +476,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v60';
+const APP_VERSION = 'v61';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -1469,7 +1474,14 @@ const AVATARS = [
     }},
 ];
 // Stable id is derived from the display name so it never falls out of sync.
-AVATARS.forEach(a => a.id = a.n.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,''));
+// `display` is the why-tagline rendered in sentence case, with any leading
+// article ("A "/"An "/"The ") stripped — used as the visible label under
+// the avatar.
+AVATARS.forEach(a => {
+  a.id = a.n.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const stripped = a.why.replace(/^(?:a|an|the)\s+/i, '');
+  a.display = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+});
 
 // Map an Open-Meteo weather_code (already adjusted by adjustCode) to the
 // matcher's coarse weather category. PoP-zero overrides happen upstream.
@@ -1977,9 +1989,9 @@ function render(weather, location) {
   const _avPick = pickAvatar(_avConditions, avatarSeed(_avConditions)).chosen;
 
   let html = `<div class="fade-in">`;
-  html += `<div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.why)}">
+  html += `<div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.n)}">
     <div class="avatar-circle">${_avPick.e}</div>
-    <div class="avatar-name">${esc(_avPick.n)}</div>
+    <div class="avatar-name">${esc(_avPick.display)}</div>
   </div>`;
   html += `<div class="current-location">${esc(location.name)}</div>`;
   if (location.region || location.country) {
