@@ -912,24 +912,26 @@ function render(weather, location) {
     ? hourlyTimes.indexOf(dayAfterDate + 'T00:00')
     : -1;
 
-  function renderHourChips(fromIdx, toIdx, firstIsNow) {
+  function renderHourChips(fromIdx, toIdx, sunriseIdx) {
     let chips = '';
     for (let i = fromIdx; i < toIdx && i < hourlyTimes.length; i++) {
       const t = new Date(hourlyTimes[i]);
       const hh = t.getHours();
-      const label = (i === fromIdx && firstIsNow) ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
+      const isNow = (i === startIdx);
+      const label = isNow ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
       const precip = weather.hourly.precipitation_probability[i];
       const precipMm = weather.hourly.precipitation[i];
       const icon = wmoIcon(adjustCode(weather.hourly.weather_code[i], precip), weather.hourly.is_day[i] === 0);
       const temp = fmt(weather.hourly.temperature_2m[i], 0);
       const windSpd = fmt(weather.hourly.wind_speed_10m[i], 0);
       const windD = windDir(weather.hourly.wind_direction_10m[i]);
-      const isNowCls = (i === fromIdx && firstIsNow) ? ' now' : '';
+      const isNowCls = isNow ? ' now' : '';
+      const sunriseAttr = (i === sunriseIdx) ? ' data-sunrise="1"' : '';
       const precipMmStr = precipMm < 0.05 ? '<0.1mm' : `${fmt(precipMm, 1)}mm`;
       const precipLabel = precip > 0
         ? `${fmt(precip, 0)}% · ${precipMmStr}`
         : `${fmt(precip, 0)}%`;
-      chips += `<div class="hour-chip${isNowCls}">
+      chips += `<div class="hour-chip${isNowCls}"${sunriseAttr}>
         <span class="h-time">${label}</span>
         <span class="h-icon">${icon}</span>
         <span class="h-temp">${temp}°</span>
@@ -940,19 +942,31 @@ function render(weather, location) {
     return chips;
   }
 
-  // ── Today's hourly forecast (now → midnight) ──
-  const todayEndIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 12;
+  // Hour index of sunrise for a given date (floor sunrise time to the hour
+  // and look up the matching slot in hourlyTimes).
+  function sunriseHourIdx(sunriseISO, dateStr) {
+    if (!sunriseISO || !dateStr) return -1;
+    const slot = sunriseISO.slice(0, 13) + ':00'; // "YYYY-MM-DDTHH:00"
+    return hourlyTimes.indexOf(slot);
+  }
+  const todaySunriseIdx = sunriseHourIdx(daily.sunrise[0], todayDate);
+  const tomorrowSunriseIdx = sunriseHourIdx(daily.sunrise[1], tomorrowDate);
+
+  // ── Today's hourly forecast (00:00 → 24:00, default-scrolled to sunrise) ──
+  const todayHourEnd = tomorrowMidnightIdx > todayMidnightIdx
+    ? tomorrowMidnightIdx
+    : Math.min(todayMidnightIdx + 24, hourlyTimes.length);
   html += `<div class="card" style="margin-top:20px;">
     <div class="card-title">Today<span class="card-title-date">${new Date(hourlyTimes[startIdx].slice(0,10) + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></div>
-    <div class="hourly-scroll">${renderHourChips(startIdx, todayEndIdx, true)}</div>
+    <div class="hourly-scroll" data-scroll-anchor="sunrise">${renderHourChips(todayMidnightIdx, todayHourEnd, todaySunriseIdx)}</div>
   </div>`;
 
-  // ── Tomorrow's hourly forecast (midnight → midnight) ──
+  // ── Tomorrow's hourly forecast (midnight → midnight, default-scrolled to sunrise) ──
   if (tomorrowMidnightIdx > 0) {
     const tomorrowEndIdx = dayAfterMidnightIdx > tomorrowMidnightIdx ? dayAfterMidnightIdx : tomorrowMidnightIdx + 24;
     html += `<div class="card">
       <div class="card-title">Tomorrow<span class="card-title-date">${new Date(tomorrowDate + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></div>
-      <div class="hourly-scroll">${renderHourChips(tomorrowMidnightIdx, tomorrowEndIdx, false)}</div>
+      <div class="hourly-scroll" data-scroll-anchor="sunrise">${renderHourChips(tomorrowMidnightIdx, tomorrowEndIdx, tomorrowSunriseIdx)}</div>
     </div>`;
   }
 
@@ -1067,6 +1081,19 @@ function render(weather, location) {
   html += `</div>`;
 
   main.innerHTML = html;
+
+  // Default-scroll each hourly strip so the sunrise chip is at the left edge.
+  // Done in rAF so layout is settled before measuring.
+  requestAnimationFrame(() => {
+    main.querySelectorAll('.hourly-scroll[data-scroll-anchor="sunrise"]').forEach(scroller => {
+      const anchor = scroller.querySelector('[data-sunrise="1"]');
+      if (!anchor) return;
+      const padLeft = parseFloat(getComputedStyle(scroller).paddingLeft) || 0;
+      const sRect = scroller.getBoundingClientRect();
+      const aRect = anchor.getBoundingClientRect();
+      scroller.scrollLeft += (aRect.left - sRect.left) - padLeft;
+    });
+  });
 }
 
 function renderDaylightArc(dawn, sunrise, sunset, dusk, now, sunriseLabel, sunsetLabel, dawnLabel, noonLabel, duskLabel, tz) {
