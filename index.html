@@ -431,8 +431,9 @@ body { transition: background 1.5s ease; }
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-// Build version. Keep in sync with CACHE_NAME in sw.js.
-const APP_VERSION = 'v58';
+// Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
+const APP_VERSION = 'v59';
+const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
 let state = {
@@ -1078,7 +1079,7 @@ function render(weather, location) {
   </div>`;
 
   // ── Updated ──
-  html += `<div class="updated">Drizzl ${APP_VERSION} · Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12: false})}</div>`;
+  html += `<div class="updated">Drizzl ${APP_VERSION} · deployed ${APP_DEPLOY_DATE}<br>Last refreshed ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12: false})}</div>`;
   html += `</div>`;
 
   main.innerHTML = html;
