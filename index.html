@@ -952,13 +952,11 @@ function render(weather, location) {
   const todaySunriseIdx = sunriseHourIdx(daily.sunrise[0], todayDate);
   const tomorrowSunriseIdx = sunriseHourIdx(daily.sunrise[1], tomorrowDate);
 
-  // ── Today's hourly forecast (00:00 → 24:00, default-scrolled to sunrise) ──
-  const todayHourEnd = tomorrowMidnightIdx > todayMidnightIdx
-    ? tomorrowMidnightIdx
-    : Math.min(todayMidnightIdx + 24, hourlyTimes.length);
+  // ── Today's hourly forecast (now → midnight; scrolls to sunrise if still ahead) ──
+  const todayEndIdx = tomorrowMidnightIdx > startIdx ? tomorrowMidnightIdx : startIdx + 12;
   html += `<div class="card" style="margin-top:20px;">
     <div class="card-title">Today<span class="card-title-date">${new Date(hourlyTimes[startIdx].slice(0,10) + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></div>
-    <div class="hourly-scroll" data-scroll-anchor="sunrise">${renderHourChips(todayMidnightIdx, todayHourEnd, todaySunriseIdx)}</div>
+    <div class="hourly-scroll" data-scroll-anchor="sunrise">${renderHourChips(startIdx, todayEndIdx, todaySunriseIdx)}</div>
   </div>`;
 
   // ── Tomorrow's hourly forecast (midnight → midnight, default-scrolled to sunrise) ──
