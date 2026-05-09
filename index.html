@@ -139,7 +139,7 @@ body { transition: background 1.5s ease; }
 /* ── Weather avatar (top-right) ── */
 .weather-avatar {
   position: absolute;
-  top: calc(var(--safe-top) + 90px);
+  top: calc(var(--safe-top) + 60px);
   right: 16px;
   width: 120px;
   text-align: center;
@@ -476,7 +476,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v61';
+const APP_VERSION = 'v62';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
