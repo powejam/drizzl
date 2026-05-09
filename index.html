@@ -136,6 +136,45 @@ body { transition: background 1.5s ease; }
 .icon-btn:hover { background: var(--bg-card-hover); }
 .icon-btn.active { background: rgba(96,165,250,0.3); }
 
+/* ── Weather avatar (top-right) ── */
+.weather-avatar {
+  position: absolute;
+  top: calc(var(--safe-top) + 60px);
+  right: 16px;
+  width: 68px;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+  user-select: none;
+}
+.avatar-circle {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.28);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px -6px rgba(0,0,0,0.35);
+}
+.avatar-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  line-height: 1.1;
+}
+/* Reserve right-edge space so long location names don't slide under the avatar. */
+.current-location, .current-region, .current-localtime {
+  padding-right: 80px;
+}
+
 /* ── Location search overlay ── */
 .overlay {
   position: fixed; inset: 0; z-index: 100;
@@ -432,7 +471,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v59';
+const APP_VERSION = 'v60';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -500,6 +539,1050 @@ function wmoIcon(code, isNight) {
   return isNight ? entry[3] : entry[1];
 }
 function wmoDailyIcon(code) { return (WMO[code] || WMO[0])[1]; }
+
+// ── Weather avatar ─────────────────────────────────────────────
+// 103 animal/mythic avatars matched to time-of-day, weather, season,
+// temperature and wind. See drizzl-avatar-lab.html for the design lab.
+const AVATARS = [
+  { e:'🐓', n:'Cockerel', why:'A herald of dawn',
+    fits:c=>{
+      if(c.time!=='dawn') return 0;
+      if(['heavy-rain','heavy-snow','thunderstorm'].includes(c.weather)) return 25;
+      if(['rain','snow','fog'].includes(c.weather)) return 60;
+      return 100;
+    }},
+  { e:'🦉', n:'Owl', why:'A watcher of the night',
+    fits:c=>{
+      if(c.time!=='night') return 0;
+      let s=60;
+      if(['clear','partly-cloudy'].includes(c.weather)) s+=30;
+      else if(c.weather==='fog') s+=25;
+      else if(c.weather==='overcast') s+=10;
+      else if(['rain','heavy-rain','thunderstorm'].includes(c.weather)) s-=20;
+      if(['autumn','winter'].includes(c.season)) s+=10;
+      return Math.max(0,s);
+    }},
+  { e:'🦅', n:'Eagle', why:'Riding the high blue',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=35;
+      if(c.windSpeed>15) s+=15;
+      if(c.windSpeed>35) s+=10;
+      return s;
+    }},
+  { e:'🦆', n:'Duck', why:'Made for the rain',
+    fits:c=>{
+      let s=0;
+      if(c.weather==='heavy-rain') s=75;
+      else if(c.weather==='rain') s=60;
+      else if(c.weather==='drizzle') s=45;
+      else if(c.weather==='overcast') s=20;
+      else return 0;
+      if(['morning','midday','afternoon'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🦢', n:'Swan', why:'Gliding through stillness',
+    fits:c=>{
+      let s=0;
+      if(c.weather==='fog') s+=35;
+      else if(c.weather==='overcast') s+=25;
+      else if(c.weather==='cloudy') s+=15;
+      else return 0;
+      if(['dawn','morning'].includes(c.time)) s+=15;
+      if(c.windSpeed<15) s+=10;
+      return s;
+    }},
+  { e:'🦩', n:'Flamingo', why:'A blaze of warm light',
+    fits:c=>{
+      if(!['midday','afternoon','dusk','dawn'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      return 45;
+    }},
+  { e:'🦚', n:'Peacock', why:'A clear-day display',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(c.weather!=='clear') return 0;
+      let s=30;
+      if(c.temp>18) s+=15;
+      if(['spring','summer'].includes(c.season)) s+=10;
+      return s;
+    }},
+  { e:'🐧', n:'Penguin', why:'At home in the cold',
+    fits:c=>{
+      let s=0;
+      if(c.temp<0) s+=30;
+      if(c.temp<-8) s+=15;
+      if(['snow','heavy-snow'].includes(c.weather)) s+=25;
+      if(c.season==='winter') s+=15;
+      if(c.weather==='overcast' && c.temp<5) s+=10;
+      if(c.weather==='fog' && c.temp<5) s+=8;
+      return s;
+    }},
+  { e:'🐦‍⬛', n:'Crow', why:'A storm-watcher',
+    fits:c=>{
+      let s=0;
+      if(c.weather==='thunderstorm') s+=60;
+      else if(c.weather==='overcast') s+=30;
+      else if(c.weather==='heavy-rain') s+=25;
+      else return 0;
+      if(c.season==='autumn') s+=15;
+      else if(c.season==='winter') s+=10;
+      return s;
+    }},
+  { e:'🦃', n:'Turkey', why:'An autumn afternoon',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(c.season!=='autumn') return 0;
+      let s=25;
+      if(['cloudy','overcast','partly-cloudy','fog'].includes(c.weather)) s+=15;
+      if(c.temp<15) s+=10;
+      return s;
+    }},
+  { e:'🪿', n:'Goose', why:'Migration calling overhead',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(!['overcast','cloudy','partly-cloudy'].includes(c.weather)) return 0;
+      let s=25;
+      if(c.season==='autumn') s+=25; else if(c.season==='spring') s+=15;
+      if(c.windSpeed>15) s+=10;
+      return s;
+    }},
+  { e:'🕊️', n:'Dove', why:'Calm and clear',
+    fits:c=>{
+      if(!['morning','midday','dawn'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=25;
+      if(c.windSpeed<10) s+=10;
+      if(c.season!=='winter') s+=10;
+      return s;
+    }},
+  { e:'🦜', n:'Parrot', why:'Tropical brightness',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      return 35;
+    }},
+  { e:'🐔', n:'Chicken', why:'A quiet farmyard',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['cloudy','partly-cloudy','overcast'].includes(c.weather)) return 0;
+      let s=22;
+      if(c.temp>5 && c.temp<22) s+=10;
+      return s;
+    }},
+  { e:'🐤', n:'Chick', why:'Spring’s first day out',
+    fits:c=>{
+      if(!['dawn','morning','midday'].includes(c.time)) return 0;
+      if(c.season!=='spring') return 0;
+      if(['heavy-rain','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
+      let s=25;
+      if(['clear','partly-cloudy'].includes(c.weather)) s+=15;
+      if(c.temp>10) s+=10;
+      return s;
+    }},
+  { e:'🐣', n:'Hatching Chick', why:'A brand-new arrival',
+    fits:c=>{
+      if(c.season!=='spring') return 0;
+      if(!['dawn','morning'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=22;
+      if(c.temp>8) s+=10;
+      return s;
+    }},
+  { e:'🐥', n:'Curious Chick', why:'A bright spring afternoon',
+    fits:c=>{
+      if(c.season!=='spring' && c.season!=='summer') return 0;
+      if(!['midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=22;
+      if(c.temp>12) s+=10;
+      if(c.season==='spring') s+=8;
+      return s;
+    }},
+  { e:'🐦', n:'Sparrow', why:'A small ordinary day',
+    fits:c=>{
+      let s=8;
+      if(['cloudy','partly-cloudy','overcast','clear'].includes(c.weather)) s+=4;
+      return s;
+    }},
+  { e:'🐺', n:'Wolf', why:'A cold-night sentinel',
+    fits:c=>{
+      if(!['night','dusk'].includes(c.time)) return 0;
+      let s=30;
+      if(c.season==='winter') s+=30;
+      if(c.temp<5) s+=15;
+      if(c.temp<-5) s+=10;
+      if(['snow','heavy-snow','clear'].includes(c.weather)) s+=15;
+      return s;
+    }},
+  { e:'🦊', n:'Fox', why:'A twilight prowler in autumn',
+    fits:c=>{
+      let s=0;
+      if(c.time==='dusk') s+=50;
+      else if(c.time==='dawn') s+=35;
+      else if(c.time==='night') s+=25;
+      else return 0;
+      if(c.season==='autumn') s+=30;
+      else if(c.season==='winter') s+=15;
+      if(['clear','partly-cloudy','fog','overcast'].includes(c.weather)) s+=10;
+      return s;
+    }},
+  { e:'🐻', n:'Bear', why:'Through the autumn woods',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      let s=0;
+      if(c.season==='autumn') s+=35; else if(c.season==='spring') s+=15; else return 0;
+      if(['overcast','cloudy','partly-cloudy','fog'].includes(c.weather)) s+=15;
+      return s;
+    }},
+  { e:'🐻‍❄️', n:'Polar Bear', why:'Bound to the deep snow',
+    fits:c=>{
+      if(c.weather==='heavy-snow') return 100;
+      if(c.weather==='snow') return 75;
+      if(c.season==='winter' && c.temp<-5) return 60;
+      if(c.season==='winter' && c.temp<0 && ['fog','overcast'].includes(c.weather)) return 35;
+      return 0;
+    }},
+  { e:'🐨', n:'Koala', why:'A warm still afternoon',
+    fits:c=>{
+      if(!['midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      if(c.temp<18) return 0;
+      let s=28;
+      if(c.windSpeed<15) s+=10;
+      return s;
+    }},
+  { e:'🐼', n:'Panda', why:'A cool overcast day',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['overcast','cloudy','partly-cloudy','fog'].includes(c.weather)) return 0;
+      if(c.temp<5 || c.temp>20) return 0;
+      let s=25;
+      if(c.season==='spring') s+=15; else if(c.season==='autumn') s+=10;
+      return s;
+    }},
+  { e:'🦁', n:'Lion', why:'Savanna heat',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<25) return 0;
+      let s=40;
+      if(c.temp>32) s+=15;
+      return s;
+    }},
+  { e:'🐅', n:'Tiger', why:'Hot humid jungle',
+    fits:c=>{
+      if(c.temp<22) return 0;
+      let s=0;
+      if(['rain','drizzle','partly-cloudy','clear'].includes(c.weather)) s+=25; else return 0;
+      if(['dusk','night','dawn'].includes(c.time)) s+=15;
+      if(c.temp>28) s+=10;
+      return s;
+    }},
+  { e:'🐆', n:'Leopard', why:'A tropical night',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      return 35;
+    }},
+  { e:'🦓', n:'Zebra', why:'Bright savanna noon',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      return 30;
+    }},
+  { e:'🦒', n:'Giraffe', why:'High and dry',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      let s=30;
+      if(c.windSpeed<20) s+=5;
+      return s;
+    }},
+  { e:'🐘', n:'Elephant', why:'Monsoon heat',
+    fits:c=>{
+      if(c.temp<22) return 0;
+      let s=0;
+      if(['rain','heavy-rain','overcast','clear','partly-cloudy'].includes(c.weather)) s+=25; else return 0;
+      if(['rain','heavy-rain'].includes(c.weather) && c.temp>25) s+=15;
+      if(['morning','midday','afternoon'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🦣', n:'Mammoth', why:'Ice-age winter',
+    fits:c=>{
+      if(c.temp>0) return 0;
+      let s=0;
+      if(['heavy-snow','snow'].includes(c.weather)) s+=40;
+      else if(c.weather==='fog') s+=20;
+      else if(c.weather==='overcast') s+=15;
+      else return 0;
+      if(c.temp<-5) s+=15;
+      if(c.season==='winter') s+=10;
+      return s;
+    }},
+  { e:'🦏', n:'Rhino', why:'Heavy still air',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['overcast','cloudy','clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      let s=25;
+      if(c.windSpeed<15) s+=10;
+      return s;
+    }},
+  { e:'🦛', n:'Hippo', why:'Wet humid heat',
+    fits:c=>{
+      if(c.temp<20) return 0;
+      let s=0;
+      if(['rain','heavy-rain','drizzle'].includes(c.weather)) s+=35;
+      else if(c.weather==='overcast' && c.temp>25) s+=20;
+      else return 0;
+      return s;
+    }},
+  { e:'🐪', n:'Camel', why:'Made for the heat',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      let s=0;
+      if(c.temp>30) s+=65; else if(c.temp>25) s+=35; else return 0;
+      if(['clear','partly-cloudy'].includes(c.weather)) s+=10;
+      return s;
+    }},
+  { e:'🐫', n:'Bactrian Camel', why:'Cold desert wind',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!(c.temp<5 && c.temp>-15)) return 0;
+      let s=25;
+      if(['clear','partly-cloudy'].includes(c.weather)) s+=15;
+      if(c.windSpeed>15) s+=10;
+      if(c.season==='winter') s+=10;
+      return s;
+    }},
+  { e:'🦙', n:'Llama', why:'High mountain air',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dawn'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      if(c.temp>15) return 0;
+      let s=25;
+      if(c.temp<5) s+=10;
+      return s;
+    }},
+  { e:'🦘', n:'Kangaroo', why:'Hot dry afternoon',
+    fits:c=>{
+      if(!['midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      let s=30;
+      if(c.temp>30) s+=10;
+      return s;
+    }},
+  { e:'🦌', n:'Stag', why:'Stepping through misty light',
+    fits:c=>{
+      let s=0;
+      if(['dawn','dusk'].includes(c.time)) s+=35;
+      else if(c.time==='morning') s+=20;
+      else return 0;
+      if(c.season==='autumn') s+=30;
+      else if(c.season==='winter') s+=15;
+      if(c.weather==='fog') s+=30;
+      else if(c.weather==='overcast') s+=10;
+      else if(['heavy-rain','thunderstorm'].includes(c.weather)) return 0;
+      return s;
+    }},
+  { e:'🐗', n:'Wild Boar', why:'Through the cold woods',
+    fits:c=>{
+      if(!['dawn','dusk','morning'].includes(c.time)) return 0;
+      let s=0;
+      if(c.season==='winter') s+=30;
+      else if(c.season==='autumn') s+=20;
+      else return 0;
+      if(['fog','overcast','snow'].includes(c.weather)) s+=15;
+      return s;
+    }},
+  { e:'🦬', n:'Bison', why:'Standing into the wind',
+    fits:c=>{
+      let s=0;
+      if(c.windSpeed>35) s+=35; else if(c.windSpeed>25) s+=20; else return 0;
+      if(['snow','heavy-snow'].includes(c.weather)) s+=25;
+      if(c.season==='winter') s+=15;
+      return s;
+    }},
+  { e:'🐂', n:'Ox', why:'A heavy grey morning',
+    fits:c=>{
+      if(!['dawn','morning','midday'].includes(c.time)) return 0;
+      if(!['overcast','fog','cloudy'].includes(c.weather)) return 0;
+      if(c.temp>15) return 0;
+      let s=25;
+      if(c.season==='autumn' || c.season==='winter') s+=10;
+      return s;
+    }},
+  { e:'🐃', n:'Water Buffalo', why:'Wet rice-field heat',
+    fits:c=>{
+      if(c.temp<22) return 0;
+      if(!['rain','drizzle','overcast','heavy-rain'].includes(c.weather)) return 0;
+      let s=35;
+      if(['morning','midday','afternoon'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🐎', n:'Horse', why:'Open windy ground',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      let s=0;
+      if(c.windSpeed>15) s+=25;
+      if(c.windSpeed>35) s+=10;
+      if(['clear','partly-cloudy','cloudy'].includes(c.weather)) s+=15;
+      else if(c.weather==='overcast') s+=10;
+      else return 0;
+      if(s<=15) return 0;
+      return s;
+    }},
+  { e:'🐐', n:'Goat', why:'A wind-blown ridge',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      let s=0;
+      if(c.windSpeed>15) s+=20;
+      if(c.windSpeed>30) s+=10;
+      if(['clear','partly-cloudy','cloudy'].includes(c.weather)) s+=15;
+      else if(c.weather==='fog') s+=10;
+      else return 0;
+      if(s<=15) return 0;
+      return s;
+    }},
+  { e:'🐏', n:'Ram', why:'High windy crag',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      let s=0;
+      if(c.season==='winter') s+=25; else if(c.season==='autumn') s+=15; else return 0;
+      if(c.windSpeed>15) s+=15;
+      if(['snow','overcast','clear','partly-cloudy'].includes(c.weather)) s+=10;
+      return s;
+    }},
+  { e:'🐑', n:'Sheep', why:'A grey, mild grazer',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      let s=0;
+      if(c.weather==='overcast') s+=30;
+      else if(c.weather==='cloudy') s+=25;
+      else if(c.weather==='partly-cloudy') s+=15;
+      else if(c.weather==='fog') s+=20;
+      else return 0;
+      if(c.temp>4 && c.temp<18) s+=10;
+      return s;
+    }},
+  { e:'🐮', n:'Cow', why:'Pastoral, mild and grey',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(!['cloudy','overcast','partly-cloudy','fog'].includes(c.weather)) return 0;
+      if(c.temp<2 || c.temp>22) return 0;
+      return 25;
+    }},
+  { e:'🐷', n:'Pig', why:'Mud and rain',
+    fits:c=>{
+      let s=0;
+      if(['rain','heavy-rain','drizzle'].includes(c.weather)) s+=30;
+      else if(c.weather==='overcast') s+=15;
+      else return 0;
+      if(c.season==='autumn') s+=15;
+      if(['morning','midday','afternoon'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🐇', n:'Hare', why:'A spring morning runner',
+    fits:c=>{
+      let s=0;
+      if(['dawn','morning'].includes(c.time)) s+=40;
+      else if(c.time==='dusk') s+=20;
+      else return 0;
+      if(c.season==='spring') s+=35;
+      else if(c.season==='summer') s+=10;
+      else if(c.season==='winter') s-=10;
+      if(['clear','partly-cloudy'].includes(c.weather)) s+=15;
+      if(['heavy-rain','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
+      return Math.max(0,s);
+    }},
+  { e:'🐰', n:'Bunny', why:'A bright spring morning',
+    fits:c=>{
+      if(!['dawn','morning','midday'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=0;
+      if(c.season==='spring') s+=30; else if(c.season==='summer') s+=15;
+      if(c.temp>10 && c.temp<25) s+=15;
+      if(s===0) return 0;
+      return s;
+    }},
+  { e:'🦔', n:'Hedgehog', why:'Snuffling through autumn evenings',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      let s=40;
+      if(c.season==='autumn') s+=30;
+      else if(c.season==='spring') s+=15;
+      else if(c.season==='winter') s-=30;
+      if(['drizzle','overcast','cloudy','partly-cloudy'].includes(c.weather)) s+=10;
+      if(c.temp<2) s-=20;
+      return Math.max(0,s);
+    }},
+  { e:'🐿️', n:'Squirrel', why:'Storing autumn’s harvest',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      let s=30;
+      if(c.season==='autumn') s+=40; else if(c.season==='spring') s+=10;
+      if(['clear','partly-cloudy','cloudy'].includes(c.weather)) s+=15;
+      if(['heavy-rain','thunderstorm','heavy-snow'].includes(c.weather)) return 0;
+      return s;
+    }},
+  { e:'🦫', n:'Beaver', why:'Working through the wet',
+    fits:c=>{
+      let s=0;
+      if(['rain','drizzle'].includes(c.weather)) s+=50;
+      else if(c.weather==='heavy-rain') s+=35;
+      else return 0;
+      if(c.season==='autumn') s+=25; else if(c.season==='spring') s+=15;
+      if(['morning','midday','afternoon','dusk'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🦦', n:'Otter', why:'Delighting in the rain',
+    fits:c=>{
+      let s=0;
+      if(c.weather==='rain') s=65;
+      else if(c.weather==='heavy-rain') s=75;
+      else if(c.weather==='drizzle') s=45;
+      else return 0;
+      if(c.time!=='night') s+=10;
+      if(c.season!=='winter') s+=5;
+      return s;
+    }},
+  { e:'🦡', n:'Badger', why:'Autumn dusk under leaves',
+    fits:c=>{
+      if(!['dusk','night','dawn'].includes(c.time)) return 0;
+      let s=0;
+      if(c.season==='autumn') s+=30;
+      else if(c.season==='winter') s+=15;
+      else if(c.season==='spring') s+=10;
+      if(['fog','overcast','clear','partly-cloudy'].includes(c.weather)) s+=15;
+      if(s<=15) return 0;
+      return s;
+    }},
+  { e:'🦨', n:'Skunk', why:'A nocturnal wanderer',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      let s=18;
+      if(c.season==='autumn') s+=20; else if(c.season==='spring') s+=10;
+      if(['clear','partly-cloudy','cloudy','overcast'].includes(c.weather)) s+=10;
+      return s;
+    }},
+  { e:'🦝', n:'Raccoon', why:'A nocturnal opportunist',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      let s=22;
+      if(['cloudy','overcast','partly-cloudy'].includes(c.weather)) s+=15;
+      if(c.season==='autumn') s+=15; else if(c.season==='spring') s+=10;
+      return s;
+    }},
+  { e:'🦥', n:'Sloth', why:'Humid heat, no hurry',
+    fits:c=>{
+      if(c.temp<22) return 0;
+      if(!['cloudy','overcast','partly-cloudy','rain','drizzle'].includes(c.weather)) return 0;
+      let s=30;
+      if(c.windSpeed<10) s+=10;
+      return s;
+    }},
+  { e:'🐭', n:'Mouse', why:'A still quiet night',
+    fits:c=>{
+      if(c.time!=='night') return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      let s=20;
+      if(c.windSpeed<10) s+=10;
+      return s;
+    }},
+  { e:'🐈', n:'Cat', why:'A sunny window',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=22;
+      if(c.temp>12 && c.temp<28) s+=10;
+      return s;
+    }},
+  { e:'🐈‍⬛', n:'Black Cat', why:'A shadow at the door',
+    fits:c=>{
+      if(!['dusk','night','dawn'].includes(c.time)) return 0;
+      let s=25;
+      if(['clear','partly-cloudy','fog'].includes(c.weather)) s+=15;
+      if(c.season==='autumn') s+=15;
+      return s;
+    }},
+  { e:'🐕', n:'Dog', why:'Out for a walk',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(['heavy-rain','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
+      let s=15;
+      if(['clear','partly-cloudy','cloudy'].includes(c.weather)) s+=10;
+      if(c.temp>2 && c.temp<25) s+=8;
+      return s;
+    }},
+  { e:'🦇', n:'Bat', why:'A summer dusk hunter',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      if(['rain','heavy-rain','snow','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
+      let s=35;
+      if(['clear','partly-cloudy','cloudy'].includes(c.weather)) s+=20;
+      if(c.season==='summer') s+=25; else if(c.season==='spring') s+=15;
+      if(c.temp>15) s+=15;
+      if(c.temp<5) s-=20;
+      return Math.max(0,s);
+    }},
+  { e:'🦧', n:'Orangutan', why:'Tropical rain canopy',
+    fits:c=>{
+      if(c.temp<22) return 0;
+      if(!['rain','drizzle','overcast','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      let s=28;
+      if(['rain','drizzle'].includes(c.weather)) s+=10;
+      return s;
+    }},
+  { e:'🐒', n:'Monkey', why:'Tropical mischief',
+    fits:c=>{
+      if(c.temp<20) return 0;
+      if(!['clear','partly-cloudy','cloudy','rain','drizzle'].includes(c.weather)) return 0;
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      return 22;
+    }},
+  { e:'🦍', n:'Gorilla', why:'Cool mountain forest',
+    fits:c=>{
+      if(c.temp<10 || c.temp>22) return 0;
+      if(!['fog','overcast','cloudy','partly-cloudy','rain','drizzle'].includes(c.weather)) return 0;
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      let s=22;
+      if(c.weather==='fog') s+=10;
+      return s;
+    }},
+  { e:'🦎', n:'Lizard', why:'Sun-warmed and still',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=0;
+      if(c.temp>25) s+=60; else if(c.temp>20) s+=40; else return 0;
+      if(c.season==='summer') s+=20;
+      return s;
+    }},
+  { e:'🐢', n:'Tortoise', why:'A slow, sunny afternoon',
+    fits:c=>{
+      if(!['midday','afternoon','morning'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      if(!(c.temp>18 && c.temp<30)) return 0;
+      let s=45;
+      if(['spring','summer'].includes(c.season)) s+=15;
+      return s;
+    }},
+  { e:'🐍', n:'Snake', why:'Sun-warmed stones',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      let s=30;
+      if(c.temp>28) s+=10;
+      return s;
+    }},
+  { e:'🐊', n:'Crocodile', why:'A swamp at noon',
+    fits:c=>{
+      if(c.temp<24) return 0;
+      if(!['clear','partly-cloudy','rain','drizzle','overcast'].includes(c.weather)) return 0;
+      let s=30;
+      if(['midday','afternoon','dusk'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🐉', n:'Dragon', why:'A storm-spirit',
+    fits:c=>{
+      if(c.weather!=='thunderstorm') return 0;
+      return 50;
+    }},
+  { e:'🦖', n:'T-Rex', why:'A dramatic sky',
+    fits:c=>{
+      if(!['thunderstorm','heavy-rain'].includes(c.weather)) return 0;
+      let s=30;
+      if(c.weather==='thunderstorm') s+=10;
+      return s;
+    }},
+  { e:'🦕', n:'Sauropod', why:'Primordial mist',
+    fits:c=>{
+      if(c.weather!=='fog') return 0;
+      let s=30;
+      if(['dawn','morning'].includes(c.time)) s+=15;
+      return s;
+    }},
+  { e:'🐳', n:'Whale', why:'Through fog and grey water',
+    fits:c=>{
+      if(c.weather==='fog') return 60;
+      if(c.weather==='overcast' && c.windSpeed>20) return 35;
+      return 0;
+    }},
+  { e:'🐬', n:'Dolphin', why:'Bright skies, bright water',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(c.weather!=='clear') return 0;
+      if(c.temp<14) return 0;
+      let s=25;
+      if(c.season==='summer') s+=10;
+      return s;
+    }},
+  { e:'🦭', n:'Seal', why:'Through cold grey water',
+    fits:c=>{
+      if(c.temp>12) return 0;
+      let s=0;
+      if(['overcast','cloudy','fog'].includes(c.weather)) s+=35;
+      else if(['rain','drizzle'].includes(c.weather)) s+=30;
+      else if(c.weather==='snow') s+=25;
+      else return 0;
+      if(c.season==='winter') s+=15;
+      return s;
+    }},
+  { e:'🐠', n:'Tropical Fish', why:'Bright clear water',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(c.weather!=='clear') return 0;
+      if(c.temp<22) return 0;
+      return 25;
+    }},
+  { e:'🐡', n:'Pufferfish', why:'A calm warm sea',
+    fits:c=>{
+      if(c.temp<20) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.windSpeed>20) return 0;
+      return 22;
+    }},
+  { e:'🦈', n:'Shark', why:'Grey sea below',
+    fits:c=>{
+      let s=0;
+      if(c.weather==='overcast') s+=25;
+      else if(c.weather==='fog') s+=20;
+      else if(c.weather==='cloudy') s+=15;
+      else return 0;
+      if(c.windSpeed>20) s+=10;
+      return s;
+    }},
+  { e:'🐙', n:'Octopus', why:'Deep and quiet',
+    fits:c=>{
+      if(c.weather!=='fog' && c.weather!=='overcast') return 0;
+      let s=0;
+      if(c.weather==='fog') s+=30; else s+=15;
+      if(c.windSpeed<15) s+=10;
+      return s;
+    }},
+  { e:'🦑', n:'Squid', why:'Mist over the water',
+    fits:c=>{
+      if(c.weather!=='fog') return 0;
+      let s=25;
+      if(['dawn','dusk','night'].includes(c.time)) s+=10;
+      return s;
+    }},
+  { e:'🦞', n:'Lobster', why:'Cold rocky shore',
+    fits:c=>{
+      if(c.temp>15) return 0;
+      if(!['fog','overcast','cloudy','rain'].includes(c.weather)) return 0;
+      let s=22;
+      if(c.windSpeed>15) s+=10;
+      return s;
+    }},
+  { e:'🦀', n:'Crab', why:'A coastal breeze',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy','overcast'].includes(c.weather)) return 0;
+      if(c.temp<10 || c.temp>26) return 0;
+      return 22;
+    }},
+  { e:'🐚', n:'Shell', why:'A quiet shore',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk','dawn'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      if(c.windSpeed>20) return 0;
+      let s=18;
+      if(c.temp>14) s+=8;
+      return s;
+    }},
+  { e:'🪼', n:'Jellyfish', why:'Drifting through fog',
+    fits:c=>{
+      if(c.weather!=='fog' && c.weather!=='overcast') return 0;
+      let s=22;
+      if(c.weather==='fog') s+=10;
+      if(c.windSpeed<10) s+=8;
+      return s;
+    }},
+  { e:'🐸', n:'Frog', why:'Singing in the wet',
+    fits:c=>{
+      let s=0;
+      if(['drizzle','rain'].includes(c.weather)) s+=50;
+      else if(c.weather==='heavy-rain') s+=30;
+      else return 0;
+      if(['spring','summer'].includes(c.season)) s+=25;
+      if(c.temp>8 && c.temp<25) s+=15;
+      if(c.temp<4) s-=30;
+      return Math.max(0,s);
+    }},
+  { e:'🐌', n:'Snail', why:'Out after the rain',
+    fits:c=>{
+      let s=0;
+      if(c.weather==='drizzle') s=65;
+      else if(c.weather==='rain') s=45;
+      else if(c.weather==='fog') s=40;
+      else if(c.weather==='overcast') s=20;
+      else return 0;
+      if(c.temp>8 && c.temp<22) s+=10;
+      if(c.temp<2) s-=30;
+      return Math.max(0,s);
+    }},
+  { e:'🦋', n:'Butterfly', why:'A drift of summer',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=0;
+      if(c.season==='summer') s+=50; else if(c.season==='spring') s+=35;
+      if(c.temp>15) s+=25;
+      if(c.temp<10) s-=30;
+      if(c.windSpeed>30) s-=15;
+      return Math.max(0,s);
+    }},
+  { e:'🐝', n:'Bee', why:'A sunlit forager',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=0;
+      if(['spring','summer'].includes(c.season)) s+=45;
+      if(c.temp>14) s+=25;
+      if(c.temp<10) s-=30;
+      return Math.max(0,s);
+    }},
+  { e:'🦗', n:'Cricket', why:'A warm-evening singer',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      if(['rain','heavy-rain','snow','heavy-snow','thunderstorm'].includes(c.weather)) return 0;
+      let s=0;
+      if(c.season==='summer') s+=50; else if(c.season==='spring') s+=20;
+      if(c.temp>16) s+=25;
+      if(c.temp<12) s-=30;
+      return Math.max(0,s);
+    }},
+  { e:'🐛', n:'Caterpillar', why:'New spring leaves',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy','cloudy'].includes(c.weather)) return 0;
+      if(c.season!=='spring' && c.season!=='summer') return 0;
+      if(c.temp<14) return 0;
+      let s=20;
+      if(c.season==='spring') s+=10;
+      return s;
+    }},
+  { e:'🐞', n:'Ladybug', why:'A sunlit leaf',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<14) return 0;
+      let s=22;
+      if(c.season==='spring') s+=15; else if(c.season==='summer') s+=10;
+      return s;
+    }},
+  { e:'🪲', n:'Beetle', why:'A warm summer hum',
+    fits:c=>{
+      if(!['morning','midday','afternoon','dusk'].includes(c.time)) return 0;
+      if(['heavy-rain','heavy-snow','thunderstorm','snow'].includes(c.weather)) return 0;
+      if(c.temp<14) return 0;
+      let s=18;
+      if(c.season==='summer') s+=15;
+      return s;
+    }},
+  { e:'🪱', n:'Worm', why:'Out after the rain',
+    fits:c=>{
+      let s=0;
+      if(['rain','heavy-rain','drizzle'].includes(c.weather)) s+=35; else return 0;
+      if(c.temp>5 && c.temp<22) s+=10;
+      return s;
+    }},
+  { e:'🕷️', n:'Spider', why:'A web in the dew',
+    fits:c=>{
+      if(!['dawn','morning','dusk','night'].includes(c.time)) return 0;
+      let s=0;
+      if(c.season==='autumn') s+=25; else if(c.season==='summer') s+=10; else return 0;
+      if(['clear','partly-cloudy','fog'].includes(c.weather)) s+=15;
+      return s;
+    }},
+  { e:'🐜', n:'Ant', why:'A productive sunny day',
+    fits:c=>{
+      if(!['morning','midday','afternoon'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<14) return 0;
+      return 18;
+    }},
+  { e:'🦂', n:'Scorpion', why:'A hot still night',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.temp<22) return 0;
+      let s=30;
+      if(c.temp>28) s+=10;
+      return s;
+    }},
+  { e:'🦄', n:'Unicorn', why:'A magical brightness',
+    fits:c=>{
+      if(c.weather!=='clear') return 0;
+      if(!['dawn','dusk'].includes(c.time)) return 0;
+      let s=20;
+      if(c.season==='spring') s+=8;
+      return s;
+    }},
+  { e:'🐦‍🔥', n:'Phoenix', why:'A burning sky',
+    fits:c=>{
+      if(!['dawn','dusk'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      let s=22;
+      if(c.weather==='partly-cloudy') s+=10;
+      return s;
+    }},
+  { e:'👻', n:'Ghost', why:'A foggy autumn night',
+    fits:c=>{
+      if(c.time!=='night' && c.time!=='dusk') return 0;
+      if(c.weather!=='fog') return 0;
+      let s=30;
+      if(c.season==='autumn') s+=10;
+      return s;
+    }},
+  { e:'🧜‍♀️', n:'Mermaid', why:'A still misty sea',
+    fits:c=>{
+      if(c.weather!=='fog' && c.weather!=='overcast') return 0;
+      if(c.windSpeed>15) return 0;
+      let s=22;
+      if(c.weather==='fog') s+=8;
+      return s;
+    }},
+  { e:'🧚', n:'Fairy', why:'A summer twilight',
+    fits:c=>{
+      if(!['dusk','night'].includes(c.time)) return 0;
+      if(!['clear','partly-cloudy'].includes(c.weather)) return 0;
+      if(c.season!=='summer' && c.season!=='spring') return 0;
+      if(c.temp<14) return 0;
+      return 22;
+    }},
+  { e:'🦤', n:'Dodo', why:'A primordial dawn',
+    fits:c=>{
+      if(c.weather!=='fog') return 0;
+      if(!['dawn','morning'].includes(c.time)) return 0;
+      return 22;
+    }},
+];
+// Stable id is derived from the display name so it never falls out of sync.
+AVATARS.forEach(a => a.id = a.n.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,''));
+
+// Map an Open-Meteo weather_code (already adjusted by adjustCode) to the
+// matcher's coarse weather category. PoP-zero overrides happen upstream.
+function avatarWeatherCategory(code) {
+  if (code === 0 || code === 1) return 'clear';
+  if (code === 2) return 'partly-cloudy';
+  if (code === 3) return 'overcast';
+  if (code === 45 || code === 48) return 'fog';
+  if ([51,53,55,56,57].includes(code)) return 'drizzle';
+  if ([61,80].includes(code)) return 'rain';
+  if ([63,81].includes(code)) return 'rain';
+  if ([65,82,66,67].includes(code)) return 'heavy-rain';
+  if ([71,73,85,77].includes(code)) return 'snow';
+  if ([75,86].includes(code)) return 'heavy-snow';
+  if ([95,96,99].includes(code)) return 'thunderstorm';
+  return 'cloudy';
+}
+function avatarTimeOfDay(now, sunriseMs, sunsetMs) {
+  if (!sunriseMs || !sunsetMs) {
+    const h = now.getHours();
+    if (h < 5) return 'night';
+    if (h < 8) return 'dawn';
+    if (h < 11) return 'morning';
+    if (h < 14) return 'midday';
+    if (h < 17) return 'afternoon';
+    if (h < 20) return 'dusk';
+    return 'night';
+  }
+  const dawnStart = sunriseMs - 45*60*1000;
+  const dawnEnd   = sunriseMs + 45*60*1000;
+  const duskStart = sunsetMs  - 45*60*1000;
+  const duskEnd   = sunsetMs  + 45*60*1000;
+  const noon      = (sunriseMs + sunsetMs)/2;
+  const middayHalf = Math.min(2*60*60*1000, (sunsetMs - sunriseMs)/4);
+  const t = now.getTime();
+  if (t < dawnStart) return 'night';
+  if (t < dawnEnd)   return 'dawn';
+  if (t < noon - middayHalf) return 'morning';
+  if (t < noon + middayHalf) return 'midday';
+  if (t < duskStart) return 'afternoon';
+  if (t < duskEnd)   return 'dusk';
+  return 'night';
+}
+function avatarSeason(date, latitude) {
+  const south = (latitude || 0) < 0;
+  const m = date.getMonth() + 1;
+  let s;
+  if (m === 12 || m === 1 || m === 2) s = 'winter';
+  else if (m >= 3 && m <= 5) s = 'spring';
+  else if (m >= 6 && m <= 8) s = 'summer';
+  else s = 'autumn';
+  if (south) s = ({winter:'summer',spring:'autumn',summer:'winter',autumn:'spring'})[s];
+  return s;
+}
+
+// FNV-1a hash → [0,1). Used to seed the avatar pick deterministically per
+// (session × bucketed conditions). Same browser session + same conditions
+// → same avatar. Different browsers → different avatars in identical conditions.
+function _avatarHash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+function _avatarSessionId() {
+  let sid;
+  try {
+    sid = localStorage.getItem('drizzl_avatar_session');
+    if (!sid) {
+      sid = Math.random().toString(36).slice(2, 12);
+      localStorage.setItem('drizzl_avatar_session', sid);
+    }
+  } catch (e) {
+    sid = 'fallback';
+  }
+  return sid;
+}
+function avatarSeed(c) {
+  const key = [
+    _avatarSessionId(),
+    c.time, c.weather, c.season,
+    Math.round(c.temp / 2) * 2,
+    Math.round(c.windSpeed / 5) * 5
+  ].join('|');
+  return _avatarHash(key);
+}
+
+// 60% band + sqrt-weighted random pick → multiple users in identical
+// conditions reliably see different avatars when several animals fit.
+function pickAvatar(c, rngSeed) {
+  const scored = AVATARS
+    .map(a => ({a, score: a.fits(c)}))
+    .filter(x => x.score > 0)
+    .sort((x,y) => y.score - x.score);
+  if (scored.length === 0) {
+    const sparrow = AVATARS.find(a => a.id === 'sparrow') || AVATARS[AVATARS.length-1];
+    return {chosen: sparrow, score: 0, ranked: [], poolSize: 0};
+  }
+  const top = scored[0].score;
+  const pool = scored.filter(x => x.score >= top * 0.6);
+  const weights = pool.map(x => Math.sqrt(x.score));
+  const totalWeight = weights.reduce((s,w) => s + w, 0);
+  let r = (rngSeed != null ? rngSeed : Math.random()) * totalWeight;
+  let chosen = pool[0];
+  for (let i = 0; i < pool.length; i++) {
+    r -= weights[i];
+    if (r <= 0) { chosen = pool[i]; break; }
+  }
+  return {chosen: chosen.a, score: chosen.score, ranked: scored, poolSize: pool.length};
+}
+
 
 // Return the most representative weather code for a given date string
 // by finding the modal hourly code during is_day hours.
@@ -869,7 +1952,35 @@ function render(weather, location) {
     .filter(Number.isFinite);
   const todayHi = todayTemps.length > 0 ? Math.max(...todayTemps) : daily.temperature_2m_max[0];
   const todayLo = todayTemps.length > 0 ? Math.min(...todayTemps) : daily.temperature_2m_min[0];
+  // ── Weather avatar pick ──
+  // Conditions feed a 104-entry matcher (see AVATARS / pickAvatar above).
+  // Sunrise/sunset come from daily.* with the same explicit-offset parse Drizzl
+  // uses elsewhere; falls back to clock-hour buckets if daily values are absent.
+  let _avSunriseMs = null, _avSunsetMs = null;
+  if (daily.sunrise && daily.sunset && daily.sunrise[0] && daily.sunset[0]) {
+    const _o = weather.utc_offset_seconds;
+    const _sg = _o >= 0 ? '+' : '-';
+    const _a = Math.abs(_o);
+    const _hh = String(Math.floor(_a / 3600)).padStart(2, '0');
+    const _mm = String(Math.floor((_a % 3600) / 60)).padStart(2, '0');
+    const _suf = `${_sg}${_hh}:${_mm}`;
+    _avSunriseMs = new Date(daily.sunrise[0] + _suf).getTime();
+    _avSunsetMs  = new Date(daily.sunset[0]  + _suf).getTime();
+  }
+  const _avConditions = {
+    time:      avatarTimeOfDay(now, _avSunriseMs, _avSunsetMs),
+    weather:   avatarWeatherCategory(adjustCode(c.weather_code, popMax)),
+    season:    avatarSeason(now, location.lat),
+    temp:      c.temperature_2m,
+    windSpeed: c.wind_speed_10m,
+  };
+  const _avPick = pickAvatar(_avConditions, avatarSeed(_avConditions)).chosen;
+
   let html = `<div class="fade-in">`;
+  html += `<div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.why)}">
+    <div class="avatar-circle">${_avPick.e}</div>
+    <div class="avatar-name">${esc(_avPick.n)}</div>
+  </div>`;
   html += `<div class="current-location">${esc(location.name)}</div>`;
   if (location.region || location.country) {
     html += `<div class="current-region">${esc([location.region, location.country].filter(Boolean).join(', '))}</div>`;
