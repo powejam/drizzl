@@ -474,7 +474,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v69';
+const APP_VERSION = 'v70';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -2047,10 +2047,19 @@ function render(weather, location) {
       const label = isNow ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
       const precip = weather.hourly.precipitation_probability[i];
       const precipMm = weather.hourly.precipitation[i];
-      const icon = wmoIcon(adjustCode(weather.hourly.weather_code[i], precip), weather.hourly.is_day[i] === 0);
-      const temp = fmt(weather.hourly.temperature_2m[i], 0);
-      const windSpd = fmt(weather.hourly.wind_speed_10m[i], 0);
-      const windD = windDir(weather.hourly.wind_direction_10m[i]);
+      // For the Now chip, use the live observation (weather.current) so the
+      // temp/icon/wind agree with the summary at the top of the page. The
+      // current-hour hourly[] entry is a forecast and can disagree by ~1°.
+      // PoP/precipMm stay from hourly because current doesn't expose them.
+      const wxCode  = isNow ? c.weather_code      : weather.hourly.weather_code[i];
+      const wxNight = isNow ? isNight             : (weather.hourly.is_day[i] === 0);
+      const wxTemp  = isNow ? c.temperature_2m    : weather.hourly.temperature_2m[i];
+      const wxWS    = isNow ? c.wind_speed_10m    : weather.hourly.wind_speed_10m[i];
+      const wxWD    = isNow ? c.wind_direction_10m: weather.hourly.wind_direction_10m[i];
+      const icon = wmoIcon(adjustCode(wxCode, precip), wxNight);
+      const temp = fmt(wxTemp, 0);
+      const windSpd = fmt(wxWS, 0);
+      const windD = windDir(wxWD);
       const isNowCls = isNow ? ' now' : '';
       const sunriseAttr = (i === sunriseIdx) ? ' data-sunrise="1"' : '';
       const precipMmStr = precipMm < 0.05 ? '<0.1mm' : `${fmt(precipMm, 1)}mm`;
