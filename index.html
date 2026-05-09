@@ -136,16 +136,13 @@ body { transition: background 1.5s ease; }
 .icon-btn:hover { background: var(--bg-card-hover); }
 .icon-btn.active { background: rgba(96,165,250,0.3); }
 
-/* ── Weather avatar (top-right) ── */
+/* ── Weather avatar (right of current-main) ── */
 .weather-avatar {
-  position: absolute;
-  top: calc(var(--safe-top) + 60px);
-  right: 16px;
-  width: 120px;
+  width: 110px;
   text-align: center;
-  z-index: 5;
   pointer-events: none;
   user-select: none;
+  flex-shrink: 0;
 }
 .avatar-circle {
   width: 56px;
@@ -169,15 +166,10 @@ body { transition: background 1.5s ease; }
   letter-spacing: 0.01em;
   color: var(--text-secondary);
   line-height: 1.25;
-  /* Clamp to two lines for very long phrases. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-/* Reserve right-edge space so the location text doesn't slide under the avatar. */
-.current-location, .current-region, .current-localtime {
-  padding-right: 120px;
 }
 
 /* ── Location search overlay ── */
@@ -256,12 +248,10 @@ body { transition: background 1.5s ease; }
   font-variant-numeric: tabular-nums;
 }
 .current-main {
-  display: flex; align-items: flex-start; gap: 16px;
-  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 4px;
 }
-.current-temp-block {
-  display: flex; flex-direction: column; gap: 6px;
-}
+.current-main-spacer { flex: 1; }
 .current-temp {
   font-family: var(--font-display);
   font-size: 4.5rem; font-weight: 700;
@@ -273,9 +263,10 @@ body { transition: background 1.5s ease; }
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
+  margin-bottom: 16px;
 }
 .current-hilo .sep { opacity: 0.5; margin: 0 6px; }
-.current-icon { font-size: 4rem; line-height: 1; margin-top: 4px; }
+.current-icon { font-size: 4rem; line-height: 1; }
 .current-details {
   display: flex; flex-wrap: wrap; gap: 8px;
   font-size: 1rem; color: var(--text-secondary);
@@ -476,7 +467,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v64';
+const APP_VERSION = 'v65';
 const APP_DEPLOY_DATE = '2026-05-09';
 
 // ── State ──
@@ -1989,10 +1980,6 @@ function render(weather, location) {
   const _avPick = pickAvatar(_avConditions, avatarSeed(_avConditions)).chosen;
 
   let html = `<div class="fade-in">`;
-  html += `<div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.n)}">
-    <div class="avatar-circle">${_avPick.e}</div>
-    <div class="avatar-name">${esc(_avPick.display)}</div>
-  </div>`;
   html += `<div class="current-location">${esc(location.name)}</div>`;
   if (location.region || location.country) {
     html += `<div class="current-region">${esc([location.region, location.country].filter(Boolean).join(', '))}</div>`;
@@ -2008,12 +1995,15 @@ function render(weather, location) {
     html += `<div class="current-localtime">Local time ${locTime} · ${utcLabel}</div>`;
   }
   html += `<div class="current-main">
-    <div class="current-temp-block">
-      <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
-      <div class="current-hilo">High ${fmt(todayHi, 0)}°<span class="sep">·</span>Low ${fmt(todayLo, 0)}°</div>
-    </div>
+    <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
     <div class="current-icon">${wmoIcon(c.weather_code, isNight)}</div>
-  </div>`;
+    <div class="current-main-spacer"></div>
+    <div class="weather-avatar" data-avatar-id="${_avPick.id}" title="${esc(_avPick.n)}">
+      <div class="avatar-circle">${_avPick.e}</div>
+      <div class="avatar-name">${esc(_avPick.display)}</div>
+    </div>
+  </div>
+  <div class="current-hilo">High ${fmt(todayHi, 0)}°<span class="sep">·</span>Low ${fmt(todayLo, 0)}°</div>`;
   html += `<div class="current-desc">${wmoDesc(c.weather_code)}</div>`;
   html += `<div class="current-details">
     <span>🌡️ Feels ${fmt(c.apparent_temperature, 0)}°</span>
