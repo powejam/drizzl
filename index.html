@@ -883,7 +883,7 @@ function render(weather, location) {
   html += `<div class="current-main">
     <div class="current-temp-block">
       <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
-      <div class="current-hilo">H ${fmt(todayHi, 0)}°<span class="sep">·</span>L ${fmt(todayLo, 0)}°</div>
+      <div class="current-hilo">High ${fmt(todayHi, 0)}°<span class="sep">·</span>Low ${fmt(todayLo, 0)}°</div>
     </div>
     <div class="current-icon">${wmoIcon(c.weather_code, isNight)}</div>
   </div>`;
