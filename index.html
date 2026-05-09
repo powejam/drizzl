@@ -215,12 +215,22 @@ body { transition: background 1.5s ease; }
   display: flex; align-items: flex-start; gap: 16px;
   margin-bottom: 16px;
 }
+.current-temp-block {
+  display: flex; flex-direction: column; gap: 6px;
+}
 .current-temp {
   font-family: var(--font-display);
   font-size: 4.5rem; font-weight: 700;
   line-height: 1; letter-spacing: -0.04em;
 }
 .current-temp sup { font-size: 2rem; font-weight: 400; }
+.current-hilo {
+  font-size: 1.15rem; font-weight: 500;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.current-hilo .sep { opacity: 0.5; margin: 0 6px; }
 .current-icon { font-size: 4rem; line-height: 1; margin-top: 4px; }
 .current-details {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -843,6 +853,18 @@ function render(weather, location) {
   const uvMax = remUV.length > 0 ? Math.max(...remUV) : daily.uv_index_max[0];
   const remPoP = weather.hourly.precipitation_probability.slice(startIdx, todayEndHourIdx);
   const popMax = remPoP.length > 0 ? Math.max(...remPoP) : daily.precipitation_probability_max[0];
+
+  // Today's full-day high/low (00:00 → 24:00) from hourly array.
+  // Daily aggregate is unreliable for the current day (backward-looking).
+  const todayMidnightIdx = Math.max(0, hourlyTimes.indexOf(todayDate + 'T00:00'));
+  const todayDayEndIdx = tomorrowMidnightIdx > todayMidnightIdx
+    ? tomorrowMidnightIdx
+    : Math.min(todayMidnightIdx + 24, hourlyTimes.length);
+  const todayTemps = weather.hourly.temperature_2m
+    .slice(todayMidnightIdx, todayDayEndIdx)
+    .filter(Number.isFinite);
+  const todayHi = todayTemps.length > 0 ? Math.max(...todayTemps) : daily.temperature_2m_max[0];
+  const todayLo = todayTemps.length > 0 ? Math.min(...todayTemps) : daily.temperature_2m_min[0];
   let html = `<div class="fade-in">`;
   html += `<div class="current-location">${esc(location.name)}</div>`;
   if (location.region || location.country) {
@@ -859,7 +881,10 @@ function render(weather, location) {
     html += `<div class="current-localtime">Local time ${locTime} · ${utcLabel}</div>`;
   }
   html += `<div class="current-main">
-    <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
+    <div class="current-temp-block">
+      <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
+      <div class="current-hilo">H ${fmt(todayHi, 0)}°<span class="sep">·</span>L ${fmt(todayLo, 0)}°</div>
+    </div>
     <div class="current-icon">${wmoIcon(c.weather_code, isNight)}</div>
   </div>`;
   html += `<div class="current-desc">${wmoDesc(c.weather_code)}</div>`;
