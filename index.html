@@ -2466,24 +2466,30 @@ function renderMoonArc(moonTimes, now, moon, tz, lat, lon) {
 
   function tx(ms) { return graphL + ((ms - tLeft) / (tRight - tLeft)) * graphW; }
 
-  // Compute altitude at regular intervals for the curve
-  // We use actual computed altitudes, not a pure cosine — the moon's motion is irregular
+  // Compute altitude at regular intervals for the curve.
+  // We plot sin(altitude), NOT raw altitude: for near-zenith transits (low
+  // latitudes / tropics, e.g. Punta Cana) the moon peaks around 87°, where
+  // arcsin's slope blows up and raw altitude forms a sharp cusp at the top.
+  // sin(altitude) is a smooth quasi-sinusoid with the same horizon crossings
+  // (sin 0 = 0); it preserves the moon's real, irregular motion but removes
+  // the artificial spike, matching the smooth shape of the sun arc.
+  const rad = Math.PI / 180;
   const steps = 150;
   let altitudes = [];
-  let maxAlt = -Infinity, minAlt = Infinity;
+  let maxV = -Infinity, minV = Infinity;
   for (let i = 0; i <= steps; i++) {
     const ms = tLeft + (tRight - tLeft) * (i / steps);
     const alt = moonAltitude(new Date(ms), lat, lon);
-    altitudes.push({ ms, alt });
-    if (alt > maxAlt) maxAlt = alt;
-    if (alt < minAlt) minAlt = alt;
+    const v = Math.sin(alt * rad);
+    altitudes.push({ ms, alt, v });
+    if (v > maxV) maxV = v;
+    if (v < minV) minV = v;
   }
 
-  // Scale altitudes to pixel coordinates
-  // Map maxAlt → topY, minAlt → bottomY
-  const altRange = maxAlt - minAlt || 1;
+  // Scale sin(altitude) to pixel coordinates. Map maxV → topY, minV → bottomY.
+  const vRange = maxV - minV || 1;
   function altToY(alt) {
-    return bottomY - ((alt - minAlt) / altRange) * (bottomY - topY);
+    return bottomY - ((Math.sin(alt * rad) - minV) / vRange) * (bottomY - topY);
   }
 
   // Horizon line: altitude = 0
