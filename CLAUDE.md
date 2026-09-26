@@ -14,9 +14,9 @@ There is nothing to build, lint, or test. To develop, serve the directory over H
 python3 -m http.server 8000
 ```
 
-**Paths are all relative** (`index.html`, `sw.js` `STATIC_ASSETS`, `manifest.json` `start_url`/`scope`), so the app works both under `powejam.github.io/drizzl/` and at the root of its own origin (the planned Cloudflare Pages `*.pages.dev` address). Keep it that way — no absolute `/drizzl/...` paths. For faithful SW testing, serve the repo root directly or under any subpath.
+**Paths are all relative** (`index.html`, `sw.js` `STATIC_ASSETS`, `manifest.json` `start_url`/`scope`), so the app works both under `powejam.github.io/drizzl/` and at the root of its own origin (`drizzl.powejam.com` / `drizzl.pages.dev`). Keep it that way — no absolute `/drizzl/...` paths. For faithful SW testing, serve the repo root directly or under any subpath.
 
-Deploy = push to `main`. Cloudflare Pages publishes it to **`drizzl.pages.dev`** (its own origin, so storage is not shared with other apps); GitHub Pages still also publishes `powejam.github.io/drizzl/` until it is retired. No build step (Pages: framework None, empty build command, output `/`). No CI/deploy script in the repo.
+Deploy = push to `main`. Cloudflare Pages (project `drizzl`) publishes it; the canonical address is **`drizzl.powejam.com`** (custom domain, its own origin, so storage is not shared with other apps), also reachable at `drizzl.pages.dev` (a separate origin with separate storage); GitHub Pages still also publishes `powejam.github.io/drizzl/` until it is retired. No build step (Pages: framework None, empty build command, output `/`). No CI/deploy script in the repo.
 
 ## Release ritual (do not skip)
 
