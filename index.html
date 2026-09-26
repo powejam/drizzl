@@ -510,7 +510,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v73';
+const APP_VERSION = 'v74';
 const APP_DEPLOY_DATE = '2026-09-26';
 
 // ── State ──
@@ -571,8 +571,30 @@ const WMO = {
   99: ['Thunderstorm + heavy hail','⛈️','⛈️','⛈️'],
 };
 function wmoDesc(code) { return (WMO[code] || WMO[0])[0]; }
-// Override precipitation weather codes when PoP is 0%
-function adjustCode(code, precip) { return (precip <= 0 && code >= 51) ? 3 : code; }
+// Open-Meteo's weather_code comes from the single deterministic model run,
+// while precipitation_probability comes from the ensemble, so on their own
+// they often disagree (a rain icon at 1%, a dry cloud at 42%). Every icon is
+// passed through rainAwareCode() with the PoP shown beside it, so a wet icon
+// appears if and only if that PoP >= RAIN_ICON_POP.
+const RAIN_ICON_POP = 40;
+// Dry code for a given cloud cover (%), used when a wet code is downgraded.
+// Unknown cover (e.g. a cached response predating hourly cloud_cover) → overcast.
+function cloudCode(cloud) {
+  if (!Number.isFinite(cloud)) return 3;
+  if (cloud < 10) return 0;
+  if (cloud < 40) return 1;
+  if (cloud < 70) return 2;
+  return 3;
+}
+function rainAwareCode(code, pop, cloud, tempC) {
+  if (!Number.isFinite(pop)) return code;
+  const wet = code >= 51;
+  if (wet && pop < RAIN_ICON_POP) return cloudCode(cloud);
+  // Model run is dry but the ensemble says rain is likely: show light showers
+  // (light snow showers at or below 1°C) rather than invent an intensity.
+  if (!wet && pop >= RAIN_ICON_POP) return Number.isFinite(tempC) && tempC <= 1 ? 85 : 80;
+  return code;
+}
 function wmoIcon(code, isNight) {
   const entry = WMO[code] || WMO[0];
   return isNight ? entry[3] : entry[1];
@@ -1088,7 +1110,7 @@ async function fetchWeather(lat, lon) {
     latitude: lat,
     longitude: lon,
     current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,cloud_cover',
-    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day,uv_index',
+    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day,uv_index,cloud_cover',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max',
     timezone: 'auto',
     forecast_days: 10,
@@ -1150,7 +1172,6 @@ function render(weather, location) {
   const now = new Date();
   const isNight = !isDay(weather, now);
 
-  updateAtmosphere(c.weather_code, location.lat, location.lon, c.temperature_2m);
   updateFavBtn();
 
   // Shift 'now' so its local getters return the location's current date (not the browser's).
@@ -1170,6 +1191,12 @@ function render(weather, location) {
   const nowISO = new Date(now.getTime() + weather.utc_offset_seconds * 1000).toISOString().slice(0, 13);
   let startIdx = hourlyTimes.findIndex(t => t.startsWith(nowISO));
   if (startIdx < 0) startIdx = 0;
+
+  // Current conditions judged against the current hour's PoP, so the header,
+  // the atmosphere theme and the Now chip all agree with the Now chip's %.
+  const nowCode = rainAwareCode(c.weather_code, weather.hourly.precipitation_probability[startIdx],
+                                c.cloud_cover, c.temperature_2m);
+  updateAtmosphere(nowCode, location.lat, location.lon, c.temperature_2m);
   const todayDate = hourlyTimes[startIdx].slice(0, 10);
   let tomorrowDate = null;
   for (let i = startIdx; i < hourlyTimes.length; i++) {
@@ -1218,10 +1245,10 @@ function render(weather, location) {
   }
   html += `<div class="current-main">
     <div class="current-temp">${fmt(c.temperature_2m, 0)}<sup>°C</sup></div>
-    <div class="current-icon">${wmoIcon(c.weather_code, isNight)}</div>
+    <div class="current-icon">${wmoIcon(nowCode, isNight)}</div>
   </div>
   <div class="current-hilo">High ${fmt(todayHi, 0)}°<span class="sep">·</span>Low ${fmt(todayLo, 0)}°</div>`;
-  html += `<div class="current-desc">${wmoDesc(c.weather_code)}</div>`;
+  html += `<div class="current-desc">${wmoDesc(nowCode)}</div>`;
   html += `<div class="current-details">
     <span>🌡️ Feels ${fmt(c.apparent_temperature, 0)}°</span>
     <span>☔ Rain ${fmt(popMax, 0)}%</span>
@@ -1259,12 +1286,13 @@ function render(weather, location) {
       // temp/icon/wind agree with the summary at the top of the page. The
       // current-hour hourly[] entry is a forecast and can disagree by ~1°.
       // PoP/precipMm stay from hourly because current doesn't expose them.
-      const wxCode  = isNow ? c.weather_code      : weather.hourly.weather_code[i];
+      const wxCode  = isNow ? nowCode             : weather.hourly.weather_code[i];
       const wxNight = isNow ? isNight             : (weather.hourly.is_day[i] === 0);
       const wxTemp  = isNow ? c.temperature_2m    : weather.hourly.temperature_2m[i];
       const wxWS    = isNow ? c.wind_speed_10m    : weather.hourly.wind_speed_10m[i];
       const wxWD    = isNow ? c.wind_direction_10m: weather.hourly.wind_direction_10m[i];
-      const icon = wmoIcon(adjustCode(wxCode, precip), wxNight);
+      const wxCloud = isNow ? c.cloud_cover       : (weather.hourly.cloud_cover || [])[i];
+      const icon = wmoIcon(rainAwareCode(wxCode, precip, wxCloud, wxTemp), wxNight);
       const temp = fmt(wxTemp, 0);
       const windSpd = fmt(wxWS, 0);
       const windD = windDir(wxWD);
@@ -1328,7 +1356,12 @@ function render(weather, location) {
     // Icon and PoP come from the same hours (see dailyHourIdxs) so they agree.
     const dayIdxs = dailyHourIdxs(daily.time[i], weather.hourly, i === 0 ? startIdx : null);
     const precip = dailyPoP(dayIdxs, daily.precipitation_probability_max[i], weather.hourly);
-    const dayCode = adjustCode(representativeDailyCode(dayIdxs, daily.weather_code[i], weather.hourly), precip);
+    const dayClouds = dayIdxs.map(j => (weather.hourly.cloud_cover || [])[j]).filter(Number.isFinite);
+    const dayCloud = dayClouds.length ? dayClouds.reduce((a, b) => a + b, 0) / dayClouds.length : undefined;
+    const dayTemps = dayIdxs.map(j => weather.hourly.temperature_2m[j]).filter(Number.isFinite);
+    const dayTempMax = dayTemps.length ? Math.max(...dayTemps) : daily.temperature_2m_max[i];
+    const dayCode = rainAwareCode(representativeDailyCode(dayIdxs, daily.weather_code[i], weather.hourly),
+                                  precip, dayCloud, dayTempMax);
     let dWindSpd, dWindD;
     if (i === 0) {
       const remWind = weather.hourly.wind_speed_10m.slice(startIdx, todayEndHourIdx);
