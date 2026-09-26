@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Drizzl is an ad-free weather **PWA** with no build step, no framework, and no dependencies. The entire app is one file — `index.html` (~2,900 lines: inline `<style>`, HTML shell, one inline `<script>`). Supporting files: `sw.js` (service worker), `manifest.json`, self-hosted `fonts/`, and `icons/`. There is no `package.json`, no bundler, and no test suite — edit `index.html`/`sw.js` directly.
+Drizzl is an ad-free weather **PWA** with no build step, no framework, and no dependencies. The entire app is one file — `index.html` (~2,100 lines: inline `<style>`, HTML shell, one inline `<script>`). Supporting files: `sw.js` (service worker), `manifest.json`, self-hosted `fonts/`, and `icons/`. There is no `package.json`, no bundler, and no test suite — edit `index.html`/`sw.js` directly.
 
 ## Commands
 
@@ -21,8 +21,8 @@ Deploy = publish to GitHub Pages (`powejam.github.io/drizzl/`). No CI/deploy scr
 ## Release ritual (do not skip)
 
 Every deploy must bump **three values in sync**, or clients get stale cached assets:
-- `APP_VERSION` — `index.html:477`
-- `APP_DEPLOY_DATE` — `index.html:478` (shown in the footer; keep it current)
+- `APP_VERSION` — `index.html:513`
+- `APP_DEPLOY_DATE` — `index.html:514` (shown in the footer; keep it current)
 - `CACHE_NAME` (`drizzl-weather-vNN`) — `sw.js:1`
 
 The service worker deletes any cache whose name ≠ `CACHE_NAME` on `activate`, so bumping `CACHE_NAME` is what actually forces the new asset set to be picked up.
@@ -38,7 +38,7 @@ The service worker deletes any cache whose name ≠ `CACHE_NAME` on `activate`, 
 
 **Persistence & location resolution.** `state = { favourites, activeLocation, weather }`, persisted to `localStorage` (`drizzl_favs`, `drizzl_active`). On launch: a manually-searched location (`isGeo:false`) is used directly; otherwise the app re-geolocates, falling back to a saved geo location, then to a hardcoded **London** default.
 
-**Timezone handling — the main source of bugs.** Open-Meteo is called with `timezone: auto`, so `hourly.time` / `daily.*` timestamps are **location-local with no TZ marker**. The browser's clock is a different zone. The code repeatedly shifts "now" by `weather.utc_offset_seconds` to line up. Note two *distinct* shift idioms used deliberately (see comments at `index.html:1921` and `index.html:1930`):
+**Timezone handling — the main source of bugs.** Open-Meteo is called with `timezone: auto`, so `hourly.time` / `daily.*` timestamps are **location-local with no TZ marker**. The browser's clock is a different zone. The code repeatedly shifts "now" by `weather.utc_offset_seconds` to line up. Note two *distinct* shift idioms used deliberately (see comments at `index.html:1140` and `index.html:1150`):
 - `now + utc_offset_seconds*1000` → for `.toISOString()` string comparison against `hourly.time`.
 - `now + utc_offset_seconds*1000 + getTimezoneOffset()*60000` → to make `Date` **getters** (`getHours`, `getDate`) return location-local values, used by `sunTimes()` and local-time display.
 Most "wrong hour" / "Now chip" regressions in the git history come from mixing these up. Today's high/low is derived from the hourly array (00:00→24:00), **not** the daily aggregate, which is backward-looking for the current day.
@@ -50,9 +50,9 @@ Most "wrong hour" / "Now chip" regressions in the git history come from mixing t
 
 **Self-contained astronomy.** Sun and moon math is computed client-side with no library: `sunTimes`, `moonPhase`, `moonAltitude`, `getMoonTimes`, plus SVG renderers `renderDaylightArc` / `renderMoonArc` / `renderMoonDisc` (dawn/noon/dusk markers, current-position dot).
 
-**Avatar system.** ~103 animal/mythic avatars in `AVATARS` (`index.html:549`). `pickAvatar()` runs each entry's `fits(c)` scorer over the current conditions (time-of-day bucket, weather category, season, temp, wind) and picks a weighted winner, seeded via `avatarSeed()` so it's stable within a session. Comments reference an external `drizzl-avatar-lab.html` design lab that is **not** in this repo.
+**Astronomical events.** The top-right badge (`renderAstroEvent`) shows the next sky event, and taps open a list of the next 12. `upcomingAstroEvents()` computes equinoxes/solstices (Meeus ch.27), new/full moons (ch.49), solar/lunar eclipses (ch.54, global — lunar ones note whether the Moon is up locally at mid-eclipse), perihelion/aphelion (ch.38, date only) and a fixed table of approximate meteor-shower peaks (`METEOR_SHOWERS`, date only). A major event within `ASTRO_MAJOR_LEAD_DAYS` pre-empts a sooner new/full moon. Times are formatted in the location's IANA zone (`weather.timezone`) so DST is correct for the event's own date.
 
-**Weather codes.** The `WMO` table (`index.html:507`) maps codes → `[description, dayIcon, altIcon, nightIcon]`. `adjustCode()` downgrades a precip code to "overcast" when probability of precipitation is 0.
+**Weather codes.** The `WMO` table (`index.html:543`) maps codes → `[description, dayIcon, altIcon, nightIcon]`. `adjustCode()` downgrades a precip code to "overcast" when probability of precipitation is 0.
 
 **Atmosphere.** `updateAtmosphere()` sets `#atmosphere`'s gradient and toggles `.atmos-*` body classes by weather + day/night + temperature; those classes also re-tune card/text contrast (e.g. dark text on the snow theme).
 
