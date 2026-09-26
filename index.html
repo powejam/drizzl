@@ -510,7 +510,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v74';
+const APP_VERSION = 'v75';
 const APP_DEPLOY_DATE = '2026-09-26';
 
 // ── State ──
@@ -537,6 +537,65 @@ function saveState() {
     localStorage.setItem('drizzl_favs', JSON.stringify(state.favourites));
     if (state.activeLocation) localStorage.setItem('drizzl_active', JSON.stringify(state.activeLocation));
   } catch(e) {}
+  idbSaveState();
+}
+
+// ── IndexedDB mirror ──
+// localStorage alone has proved unreliable for saved locations on the phone
+// (lost across a restart). IndexedDB commits transactionally, so every save is
+// mirrored there, and on launch it restores the locations if localStorage
+// comes back without them. localStorage stays authoritative whenever its keys
+// exist, so a deliberately emptied favourites list ('[]') is not resurrected.
+const IDB_NAME = 'drizzl', IDB_STORE = 'kv', IDB_KEY = 'state';
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSaveState() {
+  try {
+    const db = await idbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite', {durability: 'strict'});
+      tx.objectStore(IDB_STORE).put({favourites: state.favourites, activeLocation: state.activeLocation}, IDB_KEY);
+      tx.oncomplete = resolve;
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+  } catch (e) {}
+}
+async function idbRestoreState() {
+  let hasFavs = false, hasActive = false;
+  try {
+    hasFavs = localStorage.getItem('drizzl_favs') !== null;
+    hasActive = localStorage.getItem('drizzl_active') !== null;
+  } catch (e) {}
+  if (hasFavs && hasActive) return;
+  try {
+    const db = await idbOpen();
+    const saved = await new Promise((resolve, reject) => {
+      const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    if (!saved) return;
+    if (!hasFavs && Array.isArray(saved.favourites)) state.favourites = saved.favourites;
+    if (!hasActive && saved.activeLocation) state.activeLocation = saved.activeLocation;
+  } catch (e) {}
+}
+
+// Ask the browser not to evict this origin's storage under pressure. The
+// result is shown in the footer so eviction can be ruled in or out.
+let storagePersisted = null;
+async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    storagePersisted = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+  } catch (e) {}
 }
 
 // ── Weather codes → description & icon ──
@@ -1445,7 +1504,7 @@ function render(weather, location) {
   </div>`;
 
   // ── Updated ──
-  html += `<div class="updated">Drizzl ${APP_VERSION} · deployed ${APP_DEPLOY_DATE}<br>Last refreshed ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12: false})}</div>`;
+  html += `<div class="updated">Drizzl ${APP_VERSION} · deployed ${APP_DEPLOY_DATE}${storagePersisted === null ? '' : ` · storage ${storagePersisted ? 'persistent' : 'best-effort'}`}<br>Last refreshed ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12: false})}</div>`;
   html += `</div>`;
 
   main.innerHTML = html;
@@ -2064,31 +2123,38 @@ document.addEventListener('click', e => {
 });
 
 // ── Init ──
-loadState();
-if (state.activeLocation && !state.activeLocation.isGeo) {
-  // Saved location was manually searched — use it directly
-  loadWeather();
-} else {
-  // Either no saved location, or last location was geo-derived — re-request
-  (async () => {
-    const main = $('#main');
-    main.innerHTML = '<div class="loading"><div class="spinner"></div><div class="loading-text">Getting your location…</div></div>';
-    try {
-      const pos = await getGeoLocation();
-      const loc = await reverseGeocode(pos.lat, pos.lon);
-      state.activeLocation = loc;
-      saveState();
-      await loadWeather();
-    } catch(e) {
-      // Geolocation failed — use saved geo location if we have one, otherwise London
-      if (!state.activeLocation) {
-        state.activeLocation = { name: 'London', region: 'England', country: 'United Kingdom', lat: 51.5074, lon: -0.1278 };
+(async () => {
+  loadState();
+  await idbRestoreState();
+  // Write back so both stores hold the current state (also seeds the IndexedDB
+  // mirror for anyone upgrading with locations only in localStorage).
+  if (state.favourites.length || state.activeLocation) saveState();
+  await requestPersistentStorage();
+  if (state.activeLocation && !state.activeLocation.isGeo) {
+    // Saved location was manually searched — use it directly
+    loadWeather();
+  } else {
+    // Either no saved location, or last location was geo-derived — re-request
+    (async () => {
+      const main = $('#main');
+      main.innerHTML = '<div class="loading"><div class="spinner"></div><div class="loading-text">Getting your location…</div></div>';
+      try {
+        const pos = await getGeoLocation();
+        const loc = await reverseGeocode(pos.lat, pos.lon);
+        state.activeLocation = loc;
         saveState();
+        await loadWeather();
+      } catch(e) {
+        // Geolocation failed — use saved geo location if we have one, otherwise London
+        if (!state.activeLocation) {
+          state.activeLocation = { name: 'London', region: 'England', country: 'United Kingdom', lat: 51.5074, lon: -0.1278 };
+          saveState();
+        }
+        loadWeather();
       }
-      loadWeather();
-    }
-  })();
-}
+    })();
+  }
+})();
 
 // ── Auto-refresh ──
 async function refreshWeather() {
