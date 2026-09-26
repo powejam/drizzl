@@ -20,7 +20,7 @@ Deploy = publish to GitHub Pages (`powejam.github.io/drizzl/`). No CI/deploy scr
 
 ## Release ritual (do not skip)
 
-Every deploy must bump **three values in sync**, or clients get stale cached assets:
+Every commit that changes shipped files (`index.html`, `sw.js`, `manifest.json`, `icons/`, `fonts/`) must bump **three values in sync** in that same commit — not just at deploy time — or clients get stale cached assets:
 - `APP_VERSION` — `index.html:513`
 - `APP_DEPLOY_DATE` — `index.html:514` (shown in the footer; keep it current)
 - `CACHE_NAME` (`drizzl-weather-vNN`) — `sw.js:1`
