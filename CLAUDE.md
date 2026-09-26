@@ -60,3 +60,4 @@ Most "wrong hour" / "Now chip" regressions in the git history come from mixing t
 
 - `SCRATCH/` is gitignored — used for local screenshots / scratch files; don't commit it.
 - Keep everything inline and dependency-free; no external CDNs (CSP forbids them anyway).
+- One-person project: commit and push directly to `main`. No feature branches or PRs.
