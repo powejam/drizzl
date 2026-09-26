@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drizzl-weather-v75';
+const CACHE_NAME = 'drizzl-weather-v76';
 const STATIC_ASSETS = [
   '/drizzl/',
   '/drizzl/index.html',
@@ -25,8 +25,10 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
+    // Cache Storage is per-origin, and every powejam.github.io/* app shares
+    // the origin, so only delete Drizzl's own old caches, never other apps'.
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k.startsWith('drizzl-weather-') && k !== CACHE_NAME).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();

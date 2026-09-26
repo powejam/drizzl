@@ -25,7 +25,7 @@ Every commit that changes shipped files (`index.html`, `sw.js`, `manifest.json`,
 - `APP_DEPLOY_DATE` — `index.html:514` (shown in the footer; keep it current)
 - `CACHE_NAME` (`drizzl-weather-vNN`) — `sw.js:1`
 
-The service worker deletes any cache whose name ≠ `CACHE_NAME` on `activate`, so bumping `CACHE_NAME` is what actually forces the new asset set to be picked up.
+The service worker deletes any `drizzl-weather-*` cache whose name ≠ `CACHE_NAME` on `activate` (prefix-scoped because all `powejam.github.io/*` apps share one origin and one Cache Storage), so bumping `CACHE_NAME` is what actually forces the new asset set to be picked up.
 
 ## Architecture
 
