@@ -11,7 +11,9 @@ const STATIC_ASSETS = [
   '/drizzl/fonts/dm-sans-latin-500-normal.woff2',
   '/drizzl/fonts/dm-sans-latin-600-normal.woff2',
   '/drizzl/icons/icon-192.png',
-  '/drizzl/icons/icon-512.png'
+  '/drizzl/icons/icon-512.png',
+  '/drizzl/icons/icon.svg',
+  '/drizzl/icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', event => {
