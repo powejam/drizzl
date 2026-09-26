@@ -52,7 +52,7 @@ Most "wrong hour" / "Now chip" regressions in the git history come from mixing t
 
 **Astronomical events.** The top-right badge (`renderAstroEvent`) shows the next sky event, and taps open a list of the next 12. `upcomingAstroEvents()` computes equinoxes/solstices (Meeus ch.27), new/full moons (ch.49), solar/lunar eclipses (ch.54, global — lunar ones note whether the Moon is up locally at mid-eclipse), perihelion/aphelion (ch.38, date only) and a fixed table of approximate meteor-shower peaks (`METEOR_SHOWERS`, date only). A major event within `ASTRO_MAJOR_LEAD_DAYS` pre-empts a sooner new/full moon. Times are formatted in the location's IANA zone (`weather.timezone`) so DST is correct for the event's own date.
 
-**Weather codes.** The `WMO` table (`index.html:543`) maps codes → `[description, dayIcon, altIcon, nightIcon]`. `adjustCode()` downgrades a precip code to "overcast" when probability of precipitation is 0.
+**Weather codes.** The `WMO` table (`index.html:543`) maps codes → `[description, dayIcon, altIcon, nightIcon]`. `weather_code` (deterministic model) and `precipitation_probability` (ensemble) disagree often, so every icon goes through `rainAwareCode()` with the PoP shown beside it: a wet icon appears iff PoP ≥ `RAIN_ICON_POP` (40). Below it a wet code becomes a dry one from cloud cover (`cloudCode`); at or above it a dry code becomes light showers. The header/atmosphere use the current hour's PoP (`nowCode`); daily rows use `dailyHourIdxs()` so icon and PoP cover the same hours.
 
 **Atmosphere.** `updateAtmosphere()` sets `#atmosphere`'s gradient and toggles `.atmos-*` body classes by weather + day/night + temperature; those classes also re-tune card/text contrast (e.g. dark text on the snow theme).
 
