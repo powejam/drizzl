@@ -813,25 +813,41 @@ function renderAstroEvent(now, location, tz) {
 }
 
 
-// Return the most representative weather code for a given date string
-// by finding the modal hourly code during is_day hours.
-// Falls back to the supplied daily code if no matching hours are found.
-// When fromIdx is provided (for "today"), only hours from that index onwards
-// are considered and is_day filtering is skipped (we show what's left, not what was).
-function representativeDailyCode(dateStr, fallbackCode, hourly, fromIdx) {
-  const freq = {};
-  const start = fromIdx != null ? fromIdx : 0;
-  for (let i = start; i < hourly.time.length; i++) {
+// Hour indices that represent a forecast day. Both the daily icon and the
+// daily PoP are derived from exactly this set so they always describe the
+// same hours. For future days that's the daylight hours (is_day); when fromIdx
+// is provided (for "today"), it's every remaining hour of the day — we show
+// what's left, not what was.
+function dailyHourIdxs(dateStr, hourly, fromIdx) {
+  const idxs = [];
+  for (let i = fromIdx != null ? fromIdx : 0; i < hourly.time.length; i++) {
     if (!hourly.time[i].startsWith(dateStr)) continue;
     if (fromIdx == null && hourly.is_day[i] !== 1) continue;
+    idxs.push(i);
+  }
+  return idxs;
+}
+
+// Most representative weather code over the given hours: the modal code, ties
+// broken by the lower (less severe) code. Falls back to the supplied daily
+// code if there are no hours.
+function representativeDailyCode(idxs, fallbackCode, hourly) {
+  const freq = {};
+  for (const i of idxs) {
     const code = hourly.weather_code[i];
     freq[code] = (freq[code] || 0) + 1;
   }
   const entries = Object.entries(freq);
   if (!entries.length) return fallbackCode;
-  // Pick the code with the highest frequency; ties broken by lower (less severe) code
   entries.sort((a, b) => b[1] - a[1] || a[0] - b[0]);
   return Number(entries[0][0]);
+}
+
+// Highest PoP over the given hours; falls back to the daily aggregate (which
+// spans the full 24h) only when there are no hours, matching the icon fallback.
+function dailyPoP(idxs, fallbackPoP, hourly) {
+  const vals = idxs.map(i => hourly.precipitation_probability[i]).filter(Number.isFinite);
+  return vals.length ? Math.max(...vals) : fallbackPoP;
 }
 
 // ── Sun / twilight calculations ──
@@ -1309,14 +1325,10 @@ function render(weather, location) {
     const hi = daily.temperature_2m_max[i];
     const left = ((lo - allMin) / range) * 100;
     const width = ((hi - lo) / range) * 100;
-    // For today, use max from remaining hours only (not all-day API aggregates)
-    let precip;
-    if (i === 0) {
-      const remaining = weather.hourly.precipitation_probability.slice(startIdx, todayEndHourIdx);
-      precip = remaining.length > 0 ? Math.max(...remaining) : daily.precipitation_probability_max[0];
-    } else {
-      precip = daily.precipitation_probability_max[i];
-    }
+    // Icon and PoP come from the same hours (see dailyHourIdxs) so they agree.
+    const dayIdxs = dailyHourIdxs(daily.time[i], weather.hourly, i === 0 ? startIdx : null);
+    const precip = dailyPoP(dayIdxs, daily.precipitation_probability_max[i], weather.hourly);
+    const dayCode = adjustCode(representativeDailyCode(dayIdxs, daily.weather_code[i], weather.hourly), precip);
     let dWindSpd, dWindD;
     if (i === 0) {
       const remWind = weather.hourly.wind_speed_10m.slice(startIdx, todayEndHourIdx);
@@ -1331,9 +1343,7 @@ function render(weather, location) {
     }
     html += `<div class="daily-row">
       <span class="daily-day">${dayLabel}<br><span class="daily-day-date">${new Date(daily.time[i] + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></span>
-      <span class="daily-icon">${i === 0
-        ? wmoIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly, startIdx), precip), isNight)
-        : wmoDailyIcon(adjustCode(representativeDailyCode(daily.time[i], daily.weather_code[i], weather.hourly), precip))}</span>
+      <span class="daily-icon">${i === 0 ? wmoIcon(dayCode, isNight) : wmoDailyIcon(dayCode)}</span>
       <span class="daily-precip">${fmt(precip, 0)}%</span>
       <span class="daily-wind">💨${dWindSpd} ${dWindD}</span>
       <div class="daily-bar-wrap">
