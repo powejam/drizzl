@@ -1,19 +1,21 @@
-const CACHE_NAME = 'drizzl-weather-v76';
+const CACHE_NAME = 'drizzl-weather-v77';
+// Paths are relative to this script, so the app works both under
+// powejam.github.io/drizzl/ and at the root of its own origin (e.g. pages.dev).
 const STATIC_ASSETS = [
-  '/drizzl/',
-  '/drizzl/index.html',
-  '/drizzl/manifest.json',
-  '/drizzl/fonts/bricolage-grotesque-latin-400-normal.woff2',
-  '/drizzl/fonts/bricolage-grotesque-latin-600-normal.woff2',
-  '/drizzl/fonts/bricolage-grotesque-latin-700-normal.woff2',
-  '/drizzl/fonts/dm-sans-latin-300-normal.woff2',
-  '/drizzl/fonts/dm-sans-latin-400-normal.woff2',
-  '/drizzl/fonts/dm-sans-latin-500-normal.woff2',
-  '/drizzl/fonts/dm-sans-latin-600-normal.woff2',
-  '/drizzl/icons/icon-192.png',
-  '/drizzl/icons/icon-512.png',
-  '/drizzl/icons/icon.svg',
-  '/drizzl/icons/apple-touch-icon.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './fonts/bricolage-grotesque-latin-400-normal.woff2',
+  './fonts/bricolage-grotesque-latin-600-normal.woff2',
+  './fonts/bricolage-grotesque-latin-700-normal.woff2',
+  './fonts/dm-sans-latin-300-normal.woff2',
+  './fonts/dm-sans-latin-400-normal.woff2',
+  './fonts/dm-sans-latin-500-normal.woff2',
+  './fonts/dm-sans-latin-600-normal.woff2',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon.svg',
+  './icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', event => {
@@ -55,7 +57,7 @@ self.addEventListener('fetch', event => {
       } catch (e) {
         const cached = await caches.match(req);
         if (cached) return cached;
-        return (await caches.match('/drizzl/index.html')) || Response.error();
+        return (await caches.match('./index.html')) || Response.error();
       }
     })());
     return;

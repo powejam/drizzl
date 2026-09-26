@@ -14,9 +14,9 @@ There is nothing to build, lint, or test. To develop, serve the directory over H
 python3 -m http.server 8000
 ```
 
-**Path caveat:** the app deploys to GitHub Pages under the `/drizzl/` base path (see `manifest.json` `start_url` and the absolute `/drizzl/...` entries in `sw.js`'s `STATIC_ASSETS`). `index.html` itself uses only relative paths, so it renders fine at any URL — but the service worker's precache targets `/drizzl/...` and will only succeed when the app is served under a matching `/drizzl/` path. For faithful offline/SW testing, serve the repo so the app lives at `http://localhost:8000/drizzl/`.
+**Paths are all relative** (`index.html`, `sw.js` `STATIC_ASSETS`, `manifest.json` `start_url`/`scope`), so the app works both under `powejam.github.io/drizzl/` and at the root of its own origin (the planned Cloudflare Pages `*.pages.dev` address). Keep it that way — no absolute `/drizzl/...` paths. For faithful SW testing, serve the repo root directly or under any subpath.
 
-Deploy = publish to GitHub Pages (`powejam.github.io/drizzl/`). No CI/deploy script in the repo.
+Deploy = push to `main`; GitHub Pages publishes `powejam.github.io/drizzl/`. A move to Cloudflare Pages (free `*.pages.dev`, separate origin per app) is planned. No CI/deploy script in the repo.
 
 ## Release ritual (do not skip)
 
