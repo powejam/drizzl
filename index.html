@@ -506,12 +506,63 @@ body { transition: background 1.5s ease; }
 //  Drizzl Weather — Open-Meteo PWA
 // ═══════════════════════════════════════════
 
+// --- Retired address: Drizzl moved from GitHub Pages to Cloudflare. -------
+// Both sites build from the same main, so the old one detects itself, shows a
+// link to the new address instead of the app, and removes only Drizzl's own
+// service worker and caches (powejam.github.io is one origin shared by all the
+// apps under it). Remove this block once GitHub Pages is switched off.
+function showMovedNotice() {
+  var NEW_HOME = "https://drizzl.powejam.com/";
+  document.title = "Drizzl has moved";
+  var wrap = document.createElement("div");
+  wrap.setAttribute("style", "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
+    "justify-content:center;padding:16px;overflow:auto;background:#0b1118;color:#eef3f8;" +
+    "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;line-height:1.5");
+  var card = document.createElement("div");
+  card.setAttribute("style", "max-width:420px;width:100%;background:#16212d;border:1px solid #2a3a4b;" +
+    "border-radius:16px;padding:22px 20px");
+  var h = document.createElement("h1");
+  h.setAttribute("style", "font-size:20px;margin:0 0 8px");
+  h.textContent = "Drizzl has moved";
+  var p = document.createElement("p");
+  p.setAttribute("style", "margin:0 0 16px;color:#c4d0dc");
+  p.textContent = "This address is being retired. Drizzl now lives at drizzl.powejam.com.";
+  var a = document.createElement("a");
+  a.href = NEW_HOME;
+  a.setAttribute("style", "display:inline-block;background:#18c4b4;color:#04111f;font-weight:700;" +
+    "text-decoration:none;padding:12px 18px;border-radius:12px");
+  a.textContent = "Go to drizzl.powejam.com";
+  var s = document.createElement("small");
+  s.setAttribute("style", "display:block;margin-top:16px;color:#8fa0b1");
+  s.textContent = "Installed Drizzl on your home screen? Remove this copy and install it again from the new address. Saved locations don’t carry over, so you’ll need to add them again.";
+  card.appendChild(h); card.appendChild(p); card.appendChild(a); card.appendChild(s);
+  wrap.appendChild(card);
+  document.body.textContent = "";
+  document.body.appendChild(wrap);
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function (rs) {
+      rs.forEach(function (r) { if (new URL(r.scope).pathname.indexOf("/drizzl/") === 0) r.unregister(); });
+    }).catch(function () {});
+  }
+  if ("caches" in window) {
+    caches.keys().then(function (ks) {
+      ks.forEach(function (k) { if (k.indexOf("drizzl-weather-") === 0) caches.delete(k); });
+    }).catch(function () {});
+  }
+}
+if (location.hostname.endsWith("github.io")) {
+  showMovedNotice();
+  // Top-level throw stops the rest of this script, so the app never starts here.
+  throw new Error("Drizzl has moved to https://drizzl.powejam.com/ - not starting on the retired address");
+}
+
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v77';
-const APP_DEPLOY_DATE = '2026-09-26';
+const APP_VERSION = 'v78';
+const APP_DEPLOY_DATE = '2026-09-27';
 
 // ── State ──
 let state = {
