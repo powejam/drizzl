@@ -365,13 +365,14 @@ body { transition: background 1.5s ease; }
 }
 .day-sheet.open { display: flex; }
 .day-sheet-panel {
-  width: 100%; max-width: 520px; max-height: 85vh;
-  display: flex; flex-direction: column;
+  width: 100%; max-width: 520px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: rgba(15,23,42,0.96);
   border: 1px solid rgba(255,255,255,0.15); border-bottom: none;
   box-shadow: 0 -12px 32px -8px rgba(0,0,0,0.5);
   color: #f1f5f9;
+  /* Fixed dark panel: undo the snow theme's dark text tokens. */
+  --text-primary: #f0f0f0; --text-secondary: rgba(240,240,240,0.75); --text-dim: rgba(240,240,240,0.5);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .day-sheet-head {
@@ -385,20 +386,8 @@ body { transition: background 1.5s ease; }
   background: rgba(255,255,255,0.12); border: none; color: inherit;
   width: 36px; height: 36px; border-radius: 50%; font-size: 1rem; cursor: pointer;
 }
-.day-sheet-list { overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 12px; }
-.day-hour {
-  display: grid; grid-template-columns: 52px 36px 44px 1fr auto;
-  align-items: center; gap: 8px;
-  padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08);
-  font-size: 0.95rem;
-}
-.day-hour:first-child { border-top: none; }
-.day-hour.now { color: #93c5fd; }
-.day-hour .h-time { font-variant-numeric: tabular-nums; opacity: 0.85; }
-.day-hour .h-icon { font-size: 1.4rem; text-align: center; }
-.day-hour .h-temp { font-weight: 600; text-align: right; }
-.day-hour .h-precip { font-size: 0.85rem; color: #b3d4fc; }
-.day-hour .h-wind { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; text-align: right; }
+/* Same strip as the Today/Tomorrow cards, re-padded for the panel. */
+.day-sheet .hourly-scroll { margin: 0; padding: 12px 16px 16px; }
 .daily-day { width: 48px; font-size: 1rem; font-weight: 600; }
 .daily-day-date { font-size: 0.72rem; color: var(--text-dim); font-weight: 400; }
 .card-title-date { font-size: 0.78rem; color: var(--text-dim); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
@@ -540,7 +529,7 @@ body { transition: background 1.5s ease; }
       <div class="day-sheet-title" id="daySheetTitle"></div>
       <button class="day-sheet-close" id="closeDaySheet" aria-label="Close">✕</button>
     </div>
-    <div class="day-sheet-list" id="daySheetList"></div>
+    <div class="hourly-scroll" id="daySheetHours"></div>
   </div>
 </div>
 
@@ -620,7 +609,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v82';
+const APP_VERSION = 'v83';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -1469,6 +1458,33 @@ function windDir(deg) {
 // ── Format helpers ──
 function fmt(n, d=0) { return n != null ? n.toFixed(d) : '—'; }
 
+// Hour chips for the given hourly indices; the sunriseIdx chip is tagged as
+// the default scroll anchor (see scrollToSunrise).
+function hourChipsHtml(weather, idxs, sunriseIdx) {
+  return idxs.map(i => {
+    const h = hourData(weather, i, _nowHour);
+    const isNowCls = h.isNow ? ' now' : '';
+    const sunriseAttr = (i === sunriseIdx) ? ' data-sunrise="1"' : '';
+    return `<div class="hour-chip${isNowCls}"${sunriseAttr}>
+        <span class="h-time">${h.label}</span>
+        <span class="h-icon">${h.icon}</span>
+        <span class="h-temp">${h.temp}°</span>
+        <span class="h-precip">${h.precip}</span>
+        <span class="h-wind">💨${h.wind}</span>
+      </div>`;
+  }).join('');
+}
+
+// Scroll an hourly strip so its sunrise chip sits at the left edge.
+function scrollToSunrise(scroller) {
+  const anchor = scroller.querySelector('[data-sunrise="1"]');
+  if (!anchor) return;
+  const padLeft = parseFloat(getComputedStyle(scroller).paddingLeft) || 0;
+  const sRect = scroller.getBoundingClientRect();
+  const aRect = anchor.getBoundingClientRect();
+  scroller.scrollLeft += (aRect.left - sRect.left) - padLeft;
+}
+
 // Current hour's index and conditions, set by render(); shared with the
 // day-hours panel so its Now row matches the Today strip.
 let _nowHour = null;
@@ -1750,20 +1766,9 @@ function render(weather, location) {
   _nowHour = { idx: startIdx, code: nowCode, isNight };
 
   function renderHourChips(fromIdx, toIdx, sunriseIdx) {
-    let chips = '';
-    for (let i = fromIdx; i < toIdx && i < hourlyTimes.length; i++) {
-      const h = hourData(weather, i, _nowHour);
-      const isNowCls = h.isNow ? ' now' : '';
-      const sunriseAttr = (i === sunriseIdx) ? ' data-sunrise="1"' : '';
-      chips += `<div class="hour-chip${isNowCls}"${sunriseAttr}>
-        <span class="h-time">${h.label}</span>
-        <span class="h-icon">${h.icon}</span>
-        <span class="h-temp">${h.temp}°</span>
-        <span class="h-precip">${h.precip}</span>
-        <span class="h-wind">💨${h.wind}</span>
-      </div>`;
-    }
-    return chips;
+    const idxs = [];
+    for (let i = fromIdx; i < toIdx && i < hourlyTimes.length; i++) idxs.push(i);
+    return hourChipsHtml(weather, idxs, sunriseIdx);
   }
 
   // Hour index of sunrise for a given date (floor sunrise time to the hour
@@ -1906,14 +1911,7 @@ function render(weather, location) {
   // Default-scroll each hourly strip so the sunrise chip is at the left edge.
   // Done in rAF so layout is settled before measuring.
   requestAnimationFrame(() => {
-    main.querySelectorAll('.hourly-scroll[data-scroll-anchor="sunrise"]').forEach(scroller => {
-      const anchor = scroller.querySelector('[data-sunrise="1"]');
-      if (!anchor) return;
-      const padLeft = parseFloat(getComputedStyle(scroller).paddingLeft) || 0;
-      const sRect = scroller.getBoundingClientRect();
-      const aRect = anchor.getBoundingClientRect();
-      scroller.scrollLeft += (aRect.left - sRect.left) - padLeft;
-    });
+    main.querySelectorAll('.hourly-scroll[data-scroll-anchor="sunrise"]').forEach(scrollToSunrise);
   });
 }
 
@@ -2502,7 +2500,8 @@ async function useGeolocation() {
 // ── Day hours panel ──
 // Hour-by-hour detail for one row of the 10-day forecast, from the hourly
 // series already fetched (forecast_days covers hourly too). Today starts at
-// the current hour; other days run 00:00 → 23:00, scrolled to sunrise.
+// the current hour; other days run 00:00 → 23:00, scrolled to sunrise. Same
+// chips as the Today/Tomorrow strips.
 function openDaySheet(dayIdx) {
   const weather = state.weather;
   if (!weather || !_nowHour) return;
@@ -2522,25 +2521,12 @@ function openDaySheet(dayIdx) {
     .filter((t, i) => weather.hourly.time[i].startsWith(date) && Number.isFinite(t));
   const hiLo = temps.length ? ` · High ${fmt(Math.max(...temps), 0)}° Low ${fmt(Math.min(...temps), 0)}°` : '';
   $('#daySheetTitle').innerHTML = `${esc(dayName)}<span class="day-sheet-sub">${esc(d.toLocaleDateString([], { day: 'numeric', month: 'long' }))}${hiLo}</span>`;
-  const sunriseSlot = (weather.daily.sunrise[dayIdx] || '').slice(0, 13) + ':00';
-  $('#daySheetList').innerHTML = hours.map(i => {
-    const h = hourData(weather, i, _nowHour);
-    const anchor = weather.hourly.time[i] === sunriseSlot ? ' data-sunrise="1"' : '';
-    return `<div class="day-hour${h.isNow ? ' now' : ''}"${anchor}>
-      <span class="h-time">${h.label}</span>
-      <span class="h-icon">${h.icon}</span>
-      <span class="h-temp">${h.temp}°</span>
-      <span class="h-precip">${h.precip}</span>
-      <span class="h-wind">💨${h.wind}</span>
-    </div>`;
-  }).join('');
+  const sunriseIdx = weather.hourly.time.indexOf((weather.daily.sunrise[dayIdx] || '').slice(0, 13) + ':00');
+  const strip = $('#daySheetHours');
+  strip.innerHTML = hourChipsHtml(weather, hours, dayIdx > 0 ? sunriseIdx : -1);
   $('#daySheet').classList.add('open');
-  const list = $('#daySheetList');
-  list.scrollTop = 0;
-  if (dayIdx > 0) {
-    const anchor = list.querySelector('[data-sunrise="1"]');
-    if (anchor) list.scrollTop = anchor.offsetTop - list.offsetTop;
-  }
+  strip.scrollLeft = 0;
+  scrollToSunrise(strip);
   $('#closeDaySheet').focus();
 }
 function closeDaySheet() {
