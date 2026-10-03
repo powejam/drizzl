@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drizzl-weather-v89';
+const CACHE_NAME = 'drizzl-weather-v90';
 // Paths are relative to this script, so the app works both under
 // powejam.github.io/drizzl/ and at the root of its own origin (e.g. pages.dev).
 const STATIC_ASSETS = [

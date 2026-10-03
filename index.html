@@ -105,6 +105,10 @@ body { transition: background 1.5s ease; }
 .atmos-snow   { --atmos-bg: linear-gradient(170deg, #cbd5e1 0%, #e2e8f0 50%, #f1f5f9 100%); background: var(--atmos-bg); }
 .atmos-snow .card, .atmos-snow .astro-panel { --bg-card: rgba(0,0,0,0.3); }
 .atmos-snow { --text-primary: #1e293b; --text-secondary: rgba(30,41,59,0.65); --text-dim: rgba(30,41,59,0.4); }
+/* Light blues (rain %, featured sky event) vanish on the snow theme's grey
+   cards; navy keeps ~4.5:1 contrast there. */
+.atmos-snow .hour-chip .h-precip, .atmos-snow .daily-precip,
+.atmos-snow .astro-row.featured .astro-row-name { color: #172554; }
 
 /* ── App shell ── */
 #app {
@@ -596,7 +600,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v89';
+const APP_VERSION = 'v90';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
