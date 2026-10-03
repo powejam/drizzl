@@ -360,34 +360,19 @@ body { transition: background 1.5s ease; }
 /* ── Day hours panel (tap a 10-day row) ── */
 .day-sheet {
   position: fixed; inset: 0; z-index: 110;
-  background: rgba(0,0,0,0.6);
-  display: none; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,0.35); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  display: none; align-items: center; justify-content: center;
+  padding: 16px;
 }
 .day-sheet.open { display: flex; }
-.day-sheet-panel {
-  width: 100%; max-width: 520px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: rgba(15,23,42,0.96);
-  border: 1px solid rgba(255,255,255,0.15); border-bottom: none;
-  box-shadow: 0 -12px 32px -8px rgba(0,0,0,0.5);
-  color: #f1f5f9;
-  /* Fixed dark panel: undo the snow theme's dark text tokens. */
-  --text-primary: #f0f0f0; --text-secondary: rgba(240,240,240,0.75); --text-dim: rgba(240,240,240,0.5);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-.day-sheet-head {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.12);
-}
-.day-sheet-title { flex: 1; font-size: 1.05rem; font-weight: 600; }
-.day-sheet-sub { display: block; font-size: 0.8rem; font-weight: 400; opacity: 0.7; margin-top: 2px; }
+/* The panel is an ordinary .card (theme colours and all), sized like the
+   cards in #app; only the close button is extra. */
+.day-sheet .card { width: 100%; max-width: 448px; margin: 0; }
+.day-sheet .card-title { display: flex; align-items: baseline; }
 .day-sheet-close {
-  background: rgba(255,255,255,0.12); border: none; color: inherit;
-  width: 36px; height: 36px; border-radius: 50%; font-size: 1rem; cursor: pointer;
+  margin-left: auto; background: none; border: none; padding: 0 2px;
+  color: var(--text-secondary); font-size: 1.1rem; line-height: 1; cursor: pointer;
 }
-/* Same strip as the Today/Tomorrow cards, re-padded for the panel. */
-.day-sheet .hourly-scroll { margin: 0; padding: 12px 16px 16px; }
 .daily-day { width: 48px; font-size: 1rem; font-weight: 600; }
 .daily-day-date { font-size: 0.72rem; color: var(--text-dim); font-weight: 400; }
 .card-title-date { font-size: 0.78rem; color: var(--text-dim); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
@@ -524,11 +509,8 @@ body { transition: background 1.5s ease; }
 
 <!-- Day hours panel -->
 <div class="day-sheet" id="daySheet">
-  <div class="day-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="daySheetTitle">
-    <div class="day-sheet-head">
-      <div class="day-sheet-title" id="daySheetTitle"></div>
-      <button class="day-sheet-close" id="closeDaySheet" aria-label="Close">✕</button>
-    </div>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="daySheetTitle">
+    <div class="card-title"><span id="daySheetTitle"></span><button class="day-sheet-close" id="closeDaySheet" aria-label="Close">✕</button></div>
     <div class="hourly-scroll" id="daySheetHours"></div>
   </div>
 </div>
@@ -609,7 +591,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v83';
+const APP_VERSION = 'v84';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -2516,11 +2498,8 @@ function openDaySheet(dayIdx) {
   const d = new Date(date + 'T12:00:00');
   const dayName = dayIdx === 0 ? 'Today' : dayIdx === 1 ? 'Tomorrow'
     : d.toLocaleDateString([], { weekday: 'long' });
-  // Whole-day high/low (00:00 → 24:00) even for today, matching the header.
-  const temps = weather.hourly.temperature_2m
-    .filter((t, i) => weather.hourly.time[i].startsWith(date) && Number.isFinite(t));
-  const hiLo = temps.length ? ` · High ${fmt(Math.max(...temps), 0)}° Low ${fmt(Math.min(...temps), 0)}°` : '';
-  $('#daySheetTitle').innerHTML = `${esc(dayName)}<span class="day-sheet-sub">${esc(d.toLocaleDateString([], { day: 'numeric', month: 'long' }))}${hiLo}</span>`;
+  // Same title format as the Today/Tomorrow cards.
+  $('#daySheetTitle').innerHTML = `${esc(dayName)}<span class="card-title-date">${esc(d.toLocaleDateString([], { day: 'numeric', month: 'short' }))}</span>`;
   const sunriseIdx = weather.hourly.time.indexOf((weather.daily.sunrise[dayIdx] || '').slice(0, 13) + ':00');
   const strip = $('#daySheetHours');
   strip.innerHTML = hourChipsHtml(weather, hours, dayIdx > 0 ? sunriseIdx : -1);
