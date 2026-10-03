@@ -591,7 +591,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v87';
+const APP_VERSION = 'v88';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -602,10 +602,10 @@ let state = {
 };
 
 const STALE_MS = 60 * 60 * 1000; // 1 hour
-// A cold start within this long of the previous one reuses the saved device
-// location instead of re-geolocating (keyed on startups, not on fixes).
+// A cold start within this long of the last successful device-location fix
+// (startup or 📍) reuses the saved location instead of re-geolocating.
 const GEO_REUSE_MS = 15 * 60 * 1000;
-const LAST_START_KEY = 'drizzl_last_start';
+const LAST_GEO_KEY = 'drizzl_last_geo';
 let lastFetchTime = 0;
 
 // ── LocalStorage ──
@@ -1609,7 +1609,10 @@ function getGeoLocation() {
     try {
       if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
       navigator.geolocation.getCurrentPosition(
-        pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        pos => {
+          try { localStorage.setItem(LAST_GEO_KEY, String(Date.now())); } catch(e) {}
+          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        },
         err => reject(err),
         { timeout: 10000 }
       );
@@ -2562,16 +2565,16 @@ document.addEventListener('click', e => {
   // mirror for anyone upgrading with locations only in localStorage).
   if (state.favourites.length || state.activeLocation) saveState();
   await requestPersistentStorage();
-  let lastStart = 0;
+  let lastGeo = 0;
   try {
-    lastStart = +localStorage.getItem(LAST_START_KEY) || 0;
-    localStorage.setItem(LAST_START_KEY, String(Date.now()));
+    lastGeo = +localStorage.getItem(LAST_GEO_KEY) || 0;
+    localStorage.removeItem('drizzl_last_start'); // superseded by LAST_GEO_KEY (v87 only)
   } catch(e) {}
-  const sinceStart = Date.now() - lastStart;
-  const recentStart = sinceStart >= 0 && sinceStart < GEO_REUSE_MS; // >= 0: ignore a clock set back
-  if (state.activeLocation && (!state.activeLocation.isGeo || recentStart)) {
-    // Manually searched location, or a geo one from a startup < 15 min ago —
-    // use it directly
+  const sinceGeo = Date.now() - lastGeo;
+  const recentGeo = sinceGeo >= 0 && sinceGeo < GEO_REUSE_MS; // >= 0: ignore a clock set back
+  if (state.activeLocation && (!state.activeLocation.isGeo || recentGeo)) {
+    // Manually searched location, or a geo one fixed < 15 min ago — use it
+    // directly
     loadWeather();
   } else {
     // Either no saved location, or last location was geo-derived — re-request
