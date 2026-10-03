@@ -561,7 +561,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v79';
+const APP_VERSION = 'v80';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -878,6 +878,162 @@ function moonDistanceKm(jde) {
   return 385000.56 + sr/1000;
 }
 
+// ── Planets ──
+// Keplerian elements + rates per Julian century, valid 1800–2050
+// (Standish, JPL "Approximate Positions of the Planets", table 1):
+// [a, e, I, L, longPeri, longNode] and their rates.
+const PLANET_ELEMENTS = {
+  Mercury: [[0.38709927, 0.20563593, 7.00497902, 252.25032350, 77.45779628, 48.33076593],
+            [0.00000037, 0.00001906, -0.00594749, 149472.67411175, 0.16047689, -0.12534081]],
+  Venus:   [[0.72333566, 0.00677672, 3.39467605, 181.97909950, 131.60246718, 76.67984255],
+            [0.00000390, -0.00004107, -0.00078890, 58517.81538729, 0.00268329, -0.27769418]],
+  Earth:   [[1.00000261, 0.01671123, -0.00001531, 100.46457166, 102.93768193, 0.0],
+            [0.00000562, -0.00004392, -0.01294668, 35999.37244981, 0.32327364, 0.0]],
+  Mars:    [[1.52371034, 0.09339410, 1.84969142, -4.55343205, -23.94362959, 49.55953891],
+            [0.00001847, 0.00007882, -0.00813131, 19140.30268499, 0.44441088, -0.29257343]],
+  Jupiter: [[5.20288700, 0.04838624, 1.30439695, 34.39644051, 14.72847983, 100.47390909],
+            [-0.00011607, -0.00013253, -0.00183714, 3034.74612775, 0.21252668, 0.20469106]],
+  Saturn:  [[9.53667594, 0.05386179, 2.48599187, 49.95424423, 92.59887831, 113.66242448],
+            [-0.00125060, -0.00050991, 0.00193609, 1222.49362201, -0.41897216, -0.28867794]],
+};
+function _helio(name, T) {
+  const [el, rt] = PLANET_ELEMENTS[name];
+  const [a, e, I, L, wb, Om] = el.map((v, i) => v + rt[i] * T);
+  const w = wb - Om;
+  let M = ((L - wb) % 360 + 540) % 360 - 180;
+  let E = M + (e / _D2R) * _sin(M);
+  for (let i = 0; i < 8; i++) E -= (E - (e / _D2R) * _sin(E) - M) / (1 - e * _cos(E));
+  const xp = a * (_cos(E) - e), yp = a * Math.sqrt(1 - e*e) * _sin(E);
+  return [
+    (_cos(w)*_cos(Om) - _sin(w)*_sin(Om)*_cos(I)) * xp + (-_sin(w)*_cos(Om) - _cos(w)*_sin(Om)*_cos(I)) * yp,
+    (_cos(w)*_sin(Om) + _sin(w)*_cos(Om)*_cos(I)) * xp + (-_sin(w)*_sin(Om) + _cos(w)*_cos(Om)*_cos(I)) * yp,
+    (_sin(w)*_sin(I)) * xp + (_cos(w)*_sin(I)) * yp,
+  ];
+}
+function _toLonLat([x, y, z]) {
+  return {lon: (Math.atan2(y, x) / _D2R + 360) % 360, lat: Math.atan2(z, Math.hypot(x, y)) / _D2R};
+}
+// Geocentric ecliptic (J2000) longitude/latitude of a planet, or of the Sun.
+function planetGeo(name, jde) {
+  const T = (jde - 2451545) / 36525;
+  const ea = _helio('Earth', T);
+  if (name === 'Sun') return _toLonLat(ea.map(v => -v));
+  const p = _helio(name, T);
+  return _toLonLat(p.map((v, i) => v - ea[i]));
+}
+// Ch. 47 — geocentric Moon longitude/latitude (mean equinox of date; the
+// ~0.3°/century precession offset vs J2000 is negligible for pairings).
+const _MOON_L = [ // [D, M, M', F, Σl coefficient (1e-6 deg)]
+  [0,0,1,0,6288774],[2,0,-1,0,1274027],[2,0,0,0,658314],[0,0,2,0,213618],[0,1,0,0,-185116],
+  [0,0,0,2,-114332],[2,0,-2,0,58793],[2,-1,-1,0,57066],[2,0,1,0,53322],[2,-1,0,0,45758],
+  [0,1,-1,0,-40923],[1,0,0,0,-34720],[0,1,1,0,-30383],[2,0,0,-2,15327],[0,0,1,2,-12528],
+  [0,0,1,-2,10980],[4,0,-1,0,10675],[0,0,3,0,10034],[4,0,-2,0,8548],[2,1,-1,0,-7888],
+  [2,1,0,0,-6766],[1,0,-1,0,-5163],[1,1,0,0,4987],[2,-1,1,0,4036],[2,0,2,0,3994],
+  [4,0,0,0,3861],[2,0,-3,0,3665],[0,1,-2,0,-2689],[2,0,-1,2,-2602],[2,-1,-2,0,2390],
+  [1,0,1,0,-2348],[2,-2,0,0,2236],[0,1,2,0,-2120],[0,2,0,0,-2069],[2,-2,-1,0,2048],
+  [2,0,1,-2,-1773],[2,0,0,2,-1595],[4,-1,-1,0,1215],[0,0,2,2,-1110],[3,0,-1,0,-892],
+  [2,1,1,0,-810],[4,-1,-2,0,759],[0,2,-1,0,-713],[2,2,-1,0,-700],[2,1,-2,0,691],
+  [2,-1,0,-2,596],[4,0,1,0,549],[0,0,4,0,537],[4,-1,0,0,520],[1,0,-2,0,-487],
+];
+const _MOON_B = [ // [D, M, M', F, Σb coefficient (1e-6 deg)]
+  [0,0,0,1,5128122],[0,0,1,1,280602],[0,0,1,-1,277693],[2,0,0,-1,173237],[2,0,-1,1,55413],
+  [2,0,-1,-1,46271],[2,0,0,1,32573],[0,0,2,1,17198],[2,0,1,-1,9266],[0,0,2,-1,8822],
+  [2,-1,0,-1,8216],[2,0,-2,-1,4324],[2,0,1,1,4200],[2,1,0,-1,-3359],[2,-1,-1,1,2463],
+  [2,-1,0,1,2211],[2,-1,-1,-1,2065],[0,1,-1,-1,-1870],[4,0,-1,-1,1828],[0,1,0,1,-1794],
+  [0,0,0,3,-1749],[0,1,-1,1,-1565],[1,0,0,1,-1491],[0,1,1,1,-1475],[0,1,1,-1,-1410],
+  [0,1,0,-1,-1344],[1,0,0,-1,-1335],[0,0,3,1,1107],[4,0,0,-1,1021],[4,0,-1,1,833],
+];
+function moonGeo(jde) {
+  const T = (jde - 2451545) / 36525;
+  const Lp = 218.3164477 + 481267.88123421*T - 0.0015786*T*T + T**3/538841 - T**4/65194000;
+  const D  = 297.8501921 + 445267.1114034*T - 0.0018819*T*T + T**3/545868 - T**4/113065000;
+  const M  = 357.5291092 + 35999.0502909*T - 0.0001536*T*T + T**3/24490000;
+  const Mp = 134.9633964 + 477198.8675055*T + 0.0087414*T*T + T**3/69699 - T**4/14712000;
+  const F  = 93.2720950 + 483202.0175233*T - 0.0036539*T*T - T**3/3526000 + T**4/863310000;
+  const A1 = 119.75 + 131.849*T, A2 = 53.09 + 479264.290*T, A3 = 313.45 + 481266.484*T;
+  const E = 1 - 0.002516*T - 0.0000074*T*T;
+  let sl = 3958*_sin(A1) + 1962*_sin(Lp - F) + 318*_sin(A2);
+  let sb = -2235*_sin(Lp) + 382*_sin(A3) + 175*_sin(A1 - F) + 175*_sin(A1 + F) + 127*_sin(Lp - Mp) - 115*_sin(Lp + Mp);
+  for (const [d, m, mp, f, c] of _MOON_L) sl += c * E**Math.abs(m) * _sin(d*D + m*M + mp*Mp + f*F);
+  for (const [d, m, mp, f, c] of _MOON_B) sb += c * E**Math.abs(m) * _sin(d*D + m*M + mp*Mp + f*F);
+  return {lon: ((Lp + sl/1e6) % 360 + 360) % 360, lat: sb/1e6};
+}
+function angSep(a, b) {
+  const c = _sin(a.lat)*_sin(b.lat) + _cos(a.lat)*_cos(b.lat)*_cos(a.lon - b.lon);
+  return Math.acos(Math.min(1, Math.max(-1, c))) / _D2R;
+}
+const _wrap180 = d => ((d % 360) + 540) % 360 - 180;
+
+// Ternary search for the extremum of f on [lo, hi] (sign = 1 max, -1 min).
+function _extremum(f, lo, hi, sign) {
+  for (let i = 0; i < 40; i++) {
+    const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+    if (sign * f(m1) < sign * f(m2)) lo = m1; else hi = m2;
+  }
+  return (lo + hi) / 2;
+}
+const PAIR_PLANETS = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'];
+const MOON_PAIR_PLANETS = ['Venus', 'Mars', 'Jupiter', 'Saturn'];
+// Pairing thresholds (geocentric separation). Moon pairings are geocentric;
+// parallax shifts the Moon by up to ~1° depending on where you stand.
+const PLANET_PAIR_DEG = 1.0, MOON_PAIR_DEG = 2.0;
+// Planet events between jde0 and jde1: oppositions, greatest elongations,
+// close planet–planet and Moon–planet pairings. Returns [{jde, kind, ...}].
+function planetEvents(jde0, jde1) {
+  const out = [];
+  const elong = (p, j) => angSep(planetGeo(p, j), planetGeo('Sun', j));
+  for (const p of ['Mars', 'Jupiter', 'Saturn']) {
+    const f = j => _wrap180(planetGeo(p, j).lon - planetGeo('Sun', j).lon - 180);
+    const v = [];
+    for (let j = jde0; j <= jde1; j++) v.push(f(j));
+    for (let i = 0; i < v.length - 1; i++) {
+      const j = jde0 + i, a = v[i], b = v[i + 1];
+      if (Math.abs(a) < 20 && Math.abs(b) < 20 && Math.sign(a) !== Math.sign(b)) {
+        let lo = j, hi = j + 1;
+        for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (Math.sign(f(m)) === Math.sign(a)) lo = m; else hi = m; }
+        out.push({jde: (lo + hi) / 2, kind: 'opposition', planet: p});
+      }
+    }
+  }
+  // Sample each curve once on a fixed grid, then refine around local extrema.
+  const sample = (f, step) => { const v = []; for (let j = jde0; j <= jde1; j += step) v.push(f(j)); return v; };
+  for (const p of ['Mercury', 'Venus']) {
+    const v = sample(j => elong(p, j), 1);
+    for (let i = 1; i < v.length - 1; i++) {
+      const j = jde0 + i, a = v[i - 1], b = v[i], c = v[i + 1];
+      if (b >= a && b > c) {
+        const t = _extremum(x => elong(p, x), j - 1, j + 1, 1);
+        const east = _wrap180(planetGeo(p, t).lon - planetGeo('Sun', t).lon) > 0;
+        out.push({jde: t, kind: 'elongation', planet: p, deg: elong(p, t), east});
+      }
+    }
+  }
+  for (let i = 0; i < PAIR_PLANETS.length; i++) for (let k = i + 1; k < PAIR_PLANETS.length; k++) {
+    const p = PAIR_PLANETS[i], q = PAIR_PLANETS[k];
+    const sep = j => angSep(planetGeo(p, j), planetGeo(q, j));
+    const v = sample(sep, 1);
+    for (let i = 1; i < v.length - 1; i++) {
+      const j = jde0 + i, a = v[i - 1], b = v[i], c = v[i + 1];
+      if (b <= a && b < c && b < PLANET_PAIR_DEG + 0.5) {
+        const t = _extremum(sep, j - 1, j + 1, -1), d = sep(t);
+        if (d < PLANET_PAIR_DEG && elong(p, t) > 15 && elong(q, t) > 15) out.push({jde: t, kind: 'pair', planet: p, other: q, deg: d});
+      }
+    }
+  }
+  for (const p of MOON_PAIR_PLANETS) {
+    const sep = j => angSep(moonGeo(j), planetGeo(p, j));
+    const step = 0.25, v = sample(sep, step);
+    for (let i = 1; i < v.length - 1; i++) {
+      const j = jde0 + i * step, a = v[i - 1], b = v[i], c = v[i + 1];
+      if (b <= a && b < c && b < MOON_PAIR_DEG + 1) {
+        const t = _extremum(sep, j - step, j + step, -1), d = sep(t);
+        if (d < MOON_PAIR_DEG && elong(p, t) > 20) out.push({jde: t, kind: 'moon', planet: p, deg: d});
+      }
+    }
+  }
+  return out.sort((x, y) => x.jde - y.jde);
+}
+
 // Supermoon / micromoon thresholds (km, centre to centre). There is no
 // official definition; these are the commonly used fixed-distance cut-offs.
 const SUPERMOON_KM = 360000, MICROMOON_KM = 405000;
@@ -961,7 +1117,35 @@ function upcomingAstroEvents(now, lat, lon, tz) {
     if (notes.length) f.note = notes.join(' · ');
     delete f.km; delete f.special;
   }
+  for (const p of planetEventsCached(now)) {
+    const date = jdeToDate(p.jde);
+    if (p.kind === 'opposition') {
+      ev.push({date, name: `${p.planet} at opposition`, icon: p.planet === 'Mars' ? '🔴' : '🪐', major: true, dateOnly: true,
+               note: 'Closest and brightest for the year, up all night'});
+    } else if (p.kind === 'elongation') {
+      ev.push({date, name: `${p.planet} greatest elongation`, icon: '✨', major: p.planet === 'Venus', dateOnly: true,
+               note: `${Math.round(p.deg)}° from the Sun, best seen in the ${p.east ? 'evening' : 'morning'} sky`});
+    } else if (p.kind === 'pair') {
+      ev.push({date, name: `${p.planet} and ${p.other} close`, icon: '✨', major: true, dateOnly: true,
+               note: `${p.deg.toFixed(1)}° apart`});
+    } else {
+      ev.push({date, name: `Moon near ${p.planet}`, icon: '🌙', major: false, dateOnly: true,
+               note: `About ${p.deg.toFixed(1)}° apart (varies a little by location)`});
+    }
+  }
   return ev.filter(e => e.date > now).sort((a, b) => a.date - b.date);
+}
+
+// Planet events are location-independent and cost a few hundred ms to
+// search, so compute once per UTC day and reuse across re-renders.
+let _planetCache = {day: null, events: []};
+function planetEventsCached(now) {
+  const day = now.toISOString().slice(0, 10);
+  if (_planetCache.day !== day) {
+    const jde = now.getTime() / 86400000 + 2440587.5;
+    _planetCache = {day, events: planetEvents(jde - 2, jde + 400)};
+  }
+  return _planetCache.events;
 }
 
 // A major event within this many days takes the header slot over a sooner
