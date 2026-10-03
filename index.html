@@ -354,6 +354,51 @@ body { transition: background 1.5s ease; }
   border-bottom: 1px solid rgba(255,255,255,0.25);
 }
 .daily-row:last-child { border-bottom: none; }
+.daily-row { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.daily-row:active { background: rgba(255,255,255,0.08); }
+
+/* ── Day hours panel (tap a 10-day row) ── */
+.day-sheet {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0,0,0,0.6);
+  display: none; align-items: flex-end; justify-content: center;
+}
+.day-sheet.open { display: flex; }
+.day-sheet-panel {
+  width: 100%; max-width: 520px; max-height: 85vh;
+  display: flex; flex-direction: column;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: rgba(15,23,42,0.96);
+  border: 1px solid rgba(255,255,255,0.15); border-bottom: none;
+  box-shadow: 0 -12px 32px -8px rgba(0,0,0,0.5);
+  color: #f1f5f9;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.day-sheet-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.day-sheet-title { flex: 1; font-size: 1.05rem; font-weight: 600; }
+.day-sheet-sub { display: block; font-size: 0.8rem; font-weight: 400; opacity: 0.7; margin-top: 2px; }
+.day-sheet-close {
+  background: rgba(255,255,255,0.12); border: none; color: inherit;
+  width: 36px; height: 36px; border-radius: 50%; font-size: 1rem; cursor: pointer;
+}
+.day-sheet-list { overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 12px; }
+.day-hour {
+  display: grid; grid-template-columns: 52px 36px 44px 1fr auto;
+  align-items: center; gap: 8px;
+  padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.95rem;
+}
+.day-hour:first-child { border-top: none; }
+.day-hour.now { color: #93c5fd; }
+.day-hour .h-time { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.day-hour .h-icon { font-size: 1.4rem; text-align: center; }
+.day-hour .h-temp { font-weight: 600; text-align: right; }
+.day-hour .h-precip { font-size: 0.85rem; color: #b3d4fc; }
+.day-hour .h-wind { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; text-align: right; }
 .daily-day { width: 48px; font-size: 1rem; font-weight: 600; }
 .daily-day-date { font-size: 0.72rem; color: var(--text-dim); font-weight: 400; }
 .card-title-date { font-size: 0.78rem; color: var(--text-dim); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 8px; }
@@ -488,6 +533,17 @@ body { transition: background 1.5s ease; }
   </main>
 </div>
 
+<!-- Day hours panel -->
+<div class="day-sheet" id="daySheet">
+  <div class="day-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="daySheetTitle">
+    <div class="day-sheet-head">
+      <div class="day-sheet-title" id="daySheetTitle"></div>
+      <button class="day-sheet-close" id="closeDaySheet" aria-label="Close">✕</button>
+    </div>
+    <div class="day-sheet-list" id="daySheetList"></div>
+  </div>
+</div>
+
 <!-- Search / Favourites overlay -->
 <div class="overlay" id="overlay">
   <div class="search-box">
@@ -564,7 +620,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v81';
+const APP_VERSION = 'v82';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -1412,6 +1468,38 @@ function windDir(deg) {
 
 // ── Format helpers ──
 function fmt(n, d=0) { return n != null ? n.toFixed(d) : '—'; }
+
+// Current hour's index and conditions, set by render(); shared with the
+// day-hours panel so its Now row matches the Today strip.
+let _nowHour = null;
+
+// Display values for hourly slot i. For the current hour use the live
+// observation (weather.current) so temp/icon/wind agree with the summary at
+// the top of the page; the current-hour hourly[] entry is a forecast and can
+// disagree by ~1°. PoP/precipMm stay from hourly because current doesn't
+// expose them.
+function hourData(weather, i, now) {
+  const hr = weather.hourly, c = weather.current;
+  const isNow = !!now && i === now.idx;
+  const precip = hr.precipitation_probability[i];
+  const precipMm = hr.precipitation[i];
+  const wxCode  = isNow ? now.code             : hr.weather_code[i];
+  const wxNight = isNow ? now.isNight          : (hr.is_day[i] === 0);
+  const wxTemp  = isNow ? c.temperature_2m     : hr.temperature_2m[i];
+  const wxWS    = isNow ? c.wind_speed_10m     : hr.wind_speed_10m[i];
+  const wxWD    = isNow ? c.wind_direction_10m : hr.wind_direction_10m[i];
+  const wxCloud = isNow ? c.cloud_cover        : (hr.cloud_cover || [])[i];
+  const precipMmStr = precipMm < 0.05 ? '<0.1mm' : `${fmt(precipMm, 1)}mm`;
+  return {
+    isNow,
+    // hourly.time is bare location-local "YYYY-MM-DDTHH:MM"; slice, don't parse.
+    label: isNow ? 'Now' : hr.time[i].slice(11, 16),
+    icon: wmoIcon(rainAwareCode(wxCode, precip, wxCloud, wxTemp), wxNight),
+    temp: fmt(wxTemp, 0),
+    precip: precip > 0 ? `${fmt(precip, 0)}% · ${precipMmStr}` : `${fmt(precip, 0)}%`,
+    wind: `${fmt(wxWS, 0)} ${windDir(wxWD)}`,
+  };
+}
 function fmtTime(date, tz) {
   if (!date) return '—';
   const opts = { hour: '2-digit', minute: '2-digit', hour12: false };
@@ -1659,41 +1747,20 @@ function render(weather, location) {
     ? hourlyTimes.indexOf(dayAfterDate + 'T00:00')
     : -1;
 
+  _nowHour = { idx: startIdx, code: nowCode, isNight };
+
   function renderHourChips(fromIdx, toIdx, sunriseIdx) {
     let chips = '';
     for (let i = fromIdx; i < toIdx && i < hourlyTimes.length; i++) {
-      const t = new Date(hourlyTimes[i]);
-      const hh = t.getHours();
-      const isNow = (i === startIdx);
-      const label = isNow ? 'Now' : `${String(hh).padStart(2,'0')}:00`;
-      const precip = weather.hourly.precipitation_probability[i];
-      const precipMm = weather.hourly.precipitation[i];
-      // For the Now chip, use the live observation (weather.current) so the
-      // temp/icon/wind agree with the summary at the top of the page. The
-      // current-hour hourly[] entry is a forecast and can disagree by ~1°.
-      // PoP/precipMm stay from hourly because current doesn't expose them.
-      const wxCode  = isNow ? nowCode             : weather.hourly.weather_code[i];
-      const wxNight = isNow ? isNight             : (weather.hourly.is_day[i] === 0);
-      const wxTemp  = isNow ? c.temperature_2m    : weather.hourly.temperature_2m[i];
-      const wxWS    = isNow ? c.wind_speed_10m    : weather.hourly.wind_speed_10m[i];
-      const wxWD    = isNow ? c.wind_direction_10m: weather.hourly.wind_direction_10m[i];
-      const wxCloud = isNow ? c.cloud_cover       : (weather.hourly.cloud_cover || [])[i];
-      const icon = wmoIcon(rainAwareCode(wxCode, precip, wxCloud, wxTemp), wxNight);
-      const temp = fmt(wxTemp, 0);
-      const windSpd = fmt(wxWS, 0);
-      const windD = windDir(wxWD);
-      const isNowCls = isNow ? ' now' : '';
+      const h = hourData(weather, i, _nowHour);
+      const isNowCls = h.isNow ? ' now' : '';
       const sunriseAttr = (i === sunriseIdx) ? ' data-sunrise="1"' : '';
-      const precipMmStr = precipMm < 0.05 ? '<0.1mm' : `${fmt(precipMm, 1)}mm`;
-      const precipLabel = precip > 0
-        ? `${fmt(precip, 0)}% · ${precipMmStr}`
-        : `${fmt(precip, 0)}%`;
       chips += `<div class="hour-chip${isNowCls}"${sunriseAttr}>
-        <span class="h-time">${label}</span>
-        <span class="h-icon">${icon}</span>
-        <span class="h-temp">${temp}°</span>
-        <span class="h-precip">${precipLabel}</span>
-        <span class="h-wind">💨${windSpd} ${windD}</span>
+        <span class="h-time">${h.label}</span>
+        <span class="h-icon">${h.icon}</span>
+        <span class="h-temp">${h.temp}°</span>
+        <span class="h-precip">${h.precip}</span>
+        <span class="h-wind">💨${h.wind}</span>
       </div>`;
     }
     return chips;
@@ -1760,7 +1827,7 @@ function render(weather, location) {
       dWindSpd = fmt(daily.wind_speed_10m_max[i], 0);
       dWindD = windDir(daily.wind_direction_10m_dominant[i]);
     }
-    html += `<div class="daily-row">
+    html += `<div class="daily-row" data-day="${i}" role="button" tabindex="0" aria-label="Hourly forecast for ${dayLabel}">
       <span class="daily-day">${dayLabel}<br><span class="daily-day-date">${new Date(daily.time[i] + 'T12:00:00').toLocaleDateString([], {day:'numeric', month:'short'})}</span></span>
       <span class="daily-icon">${i === 0 ? wmoIcon(dayCode, isNight) : wmoDailyIcon(dayCode)}</span>
       <span class="daily-precip">${fmt(precip, 0)}%</span>
@@ -2432,6 +2499,54 @@ async function useGeolocation() {
   }
 }
 
+// ── Day hours panel ──
+// Hour-by-hour detail for one row of the 10-day forecast, from the hourly
+// series already fetched (forecast_days covers hourly too). Today starts at
+// the current hour; other days run 00:00 → 23:00, scrolled to sunrise.
+function openDaySheet(dayIdx) {
+  const weather = state.weather;
+  if (!weather || !_nowHour) return;
+  const date = weather.daily.time[dayIdx];
+  if (!date) return;
+  // Not dailyHourIdxs: that's daylight-only for future days; here we want all 24.
+  const hours = [];
+  for (let i = dayIdx === 0 ? _nowHour.idx : 0; i < weather.hourly.time.length; i++) {
+    if (weather.hourly.time[i].startsWith(date)) hours.push(i);
+  }
+  if (!hours.length) return;
+  const d = new Date(date + 'T12:00:00');
+  const dayName = dayIdx === 0 ? 'Today' : dayIdx === 1 ? 'Tomorrow'
+    : d.toLocaleDateString([], { weekday: 'long' });
+  // Whole-day high/low (00:00 → 24:00) even for today, matching the header.
+  const temps = weather.hourly.temperature_2m
+    .filter((t, i) => weather.hourly.time[i].startsWith(date) && Number.isFinite(t));
+  const hiLo = temps.length ? ` · High ${fmt(Math.max(...temps), 0)}° Low ${fmt(Math.min(...temps), 0)}°` : '';
+  $('#daySheetTitle').innerHTML = `${esc(dayName)}<span class="day-sheet-sub">${esc(d.toLocaleDateString([], { day: 'numeric', month: 'long' }))}${hiLo}</span>`;
+  const sunriseSlot = (weather.daily.sunrise[dayIdx] || '').slice(0, 13) + ':00';
+  $('#daySheetList').innerHTML = hours.map(i => {
+    const h = hourData(weather, i, _nowHour);
+    const anchor = weather.hourly.time[i] === sunriseSlot ? ' data-sunrise="1"' : '';
+    return `<div class="day-hour${h.isNow ? ' now' : ''}"${anchor}>
+      <span class="h-time">${h.label}</span>
+      <span class="h-icon">${h.icon}</span>
+      <span class="h-temp">${h.temp}°</span>
+      <span class="h-precip">${h.precip}</span>
+      <span class="h-wind">💨${h.wind}</span>
+    </div>`;
+  }).join('');
+  $('#daySheet').classList.add('open');
+  const list = $('#daySheetList');
+  list.scrollTop = 0;
+  if (dayIdx > 0) {
+    const anchor = list.querySelector('[data-sunrise="1"]');
+    if (anchor) list.scrollTop = anchor.offsetTop - list.offsetTop;
+  }
+  $('#closeDaySheet').focus();
+}
+function closeDaySheet() {
+  $('#daySheet').classList.remove('open');
+}
+
 // ── Event bindings ──
 $('#btnSearch').addEventListener('click', openOverlay);
 $('#closeOverlay').addEventListener('click', closeOverlay);
@@ -2440,8 +2555,21 @@ $('#btnGeo').addEventListener('click', useGeolocation);
 $('#searchInput').addEventListener('input', debounce(doSearch, 300));
 $('#searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
-// Close overlay on escape
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOverlay(); });
+$('#main').addEventListener('click', e => {
+  const row = e.target.closest('.daily-row[data-day]');
+  if (row) openDaySheet(+row.dataset.day);
+});
+$('#main').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.daily-row[data-day]');
+  if (row) { e.preventDefault(); openDaySheet(+row.dataset.day); }
+});
+$('#closeDaySheet').addEventListener('click', closeDaySheet);
+// Tap on the dimmed backdrop (outside the panel) closes it
+$('#daySheet').addEventListener('click', e => { if (e.target === e.currentTarget) closeDaySheet(); });
+
+// Close overlays on escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeOverlay(); closeDaySheet(); } });
 
 // Close the sky-events panel on any tap outside it
 document.addEventListener('click', e => {
