@@ -600,7 +600,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v90';
+const APP_VERSION = 'v91';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -1404,44 +1404,44 @@ function moonAltitude(date, lat, lon) {
 }
 
 function getMoonTimes(date, lat, lon, tz) {
-  // Scan ±14h around 'now' to find the nearest transit, then rise/set around it
+  // Scan ±36h around 'now' (more than a lunar day either side) so the rise
+  // and set of the pass nearest now are always found, even when one falls
+  // on the previous or next calendar day.
   const nowMs = date.getTime();
-  const scanStart = nowMs - 14 * 3600000;
-  const scanEnd   = nowMs + 14 * 3600000;
-  const step = 5; // minutes
+  const scanStart = nowMs - 36 * 3600000;
+  const scanEnd   = nowMs + 36 * 3600000;
+  const stepMs = 5 * 60000;
 
-  // Pass 1: find all zero-crossings and the global max (transit)
-  let crossings = []; // { time, type: 'rise'|'set' }
-  let maxAlt = -Infinity, maxAltTime = null;
-  let prevAlt = moonAltitude(new Date(scanStart), lat, lon);
-
-  for (let ms = scanStart + step * 60000; ms <= scanEnd; ms += step * 60000) {
-    const t = new Date(ms);
-    const alt = moonAltitude(t, lat, lon);
-
-    if (alt > maxAlt) { maxAlt = alt; maxAltTime = t; }
-
-    if (prevAlt <= 0 && alt > 0) {
-      const frac = -prevAlt / (alt - prevAlt);
-      crossings.push({ time: new Date(ms - step * 60000 * (1 - frac)), type: 'rise' });
-    } else if (prevAlt > 0 && alt <= 0) {
-      const frac = prevAlt / (prevAlt - alt);
-      crossings.push({ time: new Date(ms - step * 60000 * (1 - frac)), type: 'set' });
-    }
-    prevAlt = alt;
+  const samples = [];
+  for (let ms = scanStart; ms <= scanEnd; ms += stepMs) {
+    samples.push({ ms, alt: moonAltitude(new Date(ms), lat, lon) });
   }
 
-  // Pass 2: pick the rise/set pair that brackets the transit
-  const transitMs = maxAltTime ? maxAltTime.getTime() : nowMs;
+  // Horizon crossings (interpolated) and upper transits (local maxima)
+  const crossings = []; // { ms, type: 'rise'|'set' }
+  const transits = [];  // indices into samples
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1], b = samples[i];
+    if (a.alt <= 0 && b.alt > 0) {
+      crossings.push({ ms: a.ms + stepMs * (-a.alt / (b.alt - a.alt)), type: 'rise' });
+    } else if (a.alt > 0 && b.alt <= 0) {
+      crossings.push({ ms: a.ms + stepMs * (a.alt / (a.alt - b.alt)), type: 'set' });
+    }
+    if (i < samples.length - 1 && b.alt > a.alt && b.alt >= samples[i + 1].alt) transits.push(i);
+  }
+  if (!transits.length) return { rise: null, set: null, transit: null, transitAlt: null };
+
+  // The transit nearest now, then the rise before it and the set after it
+  const ti = transits.reduce((best, i) =>
+    Math.abs(samples[i].ms - nowMs) < Math.abs(samples[best].ms - nowMs) ? i : best);
+  const transitMs = samples[ti].ms;
   let rise = null, set = null;
   for (const c of crossings) {
-    if (c.type === 'rise' && c.time.getTime() <= transitMs) rise = c.time;
-  }
-  for (const c of crossings) {
-    if (c.type === 'set' && c.time.getTime() >= transitMs) { set = c.time; break; }
+    if (c.type === 'rise' && c.ms <= transitMs) rise = new Date(c.ms);
+    if (c.type === 'set' && c.ms >= transitMs && !set) set = new Date(c.ms);
   }
 
-  return { rise, set, transit: maxAltTime, transitAlt: maxAlt };
+  return { rise, set, transit: new Date(transitMs), transitAlt: samples[ti].alt };
 }
 
 // ── Wind direction ──
@@ -2248,7 +2248,21 @@ function renderMoonArc(moonTimes, now, moon, tz, lat, lon) {
   const riseMs = rise ? rise.getTime() : null;
   const setMs  = set  ? set.getTime()  : null;
   const inView = (ms) => ms !== null && ms >= tLeft && ms <= tRight;
-  function clampX(x) { return Math.max(graphL + 20, Math.min(graphR - 20, x)); }
+  function clampX(x, halfW = graphL + 20) { return Math.max(halfW, Math.min(W - halfW, x)); }
+
+  // Rise/set are always labelled (clamped to the edge if off the graph),
+  // with the day named when it isn't today in the location's zone.
+  const ymd = d => d.toLocaleDateString('en-CA', tz ? { timeZone: tz } : {});
+  const todayYmd = ymd(now);
+  function eventHead(name, d) {
+    const diff = Math.round((Date.parse(ymd(d)) - Date.parse(todayYmd)) / 86400000);
+    return diff === 0 ? name : `${name} ${diff === -1 ? 'yesterday' : diff === 1 ? 'tomorrow'
+      : d.toLocaleDateString([], { weekday: 'short', ...(tz ? { timeZone: tz } : {}) })}`;
+  }
+  const riseHead = rise ? eventHead('Moonrise', rise) : null;
+  const setHead  = set  ? eventHead('Moonset', set)   : null;
+  // ~0.5em per character at the 17px label size, +4px breathing room
+  const halfW = head => Math.max(graphL + 20, head.length * 4.25 + 4);
 
   const riseLabel = rise ? fmtTime(rise, tz) : null;
   const setLabel  = set  ? fmtTime(set, tz)  : null;
@@ -2270,14 +2284,14 @@ function renderMoonArc(moonTimes, now, moon, tz, lat, lon) {
       </linearGradient>
     </defs>
 
-    ${inView(riseMs) ? `
-      <text x="${clampX(xRise).toFixed(1)}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="17" font-family="var(--font-body)">Moonrise</text>
-      <text x="${clampX(xRise).toFixed(1)}" y="40" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${riseLabel}</text>
+    ${rise ? `
+      <text x="${clampX(xRise, halfW(riseHead)).toFixed(1)}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="17" font-family="var(--font-body)">${riseHead}</text>
+      <text x="${clampX(xRise, halfW(riseHead)).toFixed(1)}" y="40" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${riseLabel}</text>
     ` : ''}
 
-    ${inView(setMs) ? `
-      <text x="${clampX(xSet).toFixed(1)}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="17" font-family="var(--font-body)">Moonset</text>
-      <text x="${clampX(xSet).toFixed(1)}" y="40" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${setLabel}</text>
+    ${set ? `
+      <text x="${clampX(xSet, halfW(setHead)).toFixed(1)}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="17" font-family="var(--font-body)">${setHead}</text>
+      <text x="${clampX(xSet, halfW(setHead)).toFixed(1)}" y="40" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-weight="600" font-family="var(--font-display)">${setLabel}</text>
     ` : ''}
 
     ${fillPath ? `<path d="${fillPath}" fill="url(#moonFill)" />` : ''}
