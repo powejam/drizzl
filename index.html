@@ -93,17 +93,17 @@ body {
 }
 body { transition: background 1.5s ease; }
 /* Card/chip overrides for light-background periods */
-.atmos-day .card { --bg-card: rgba(0,0,0,0.3); }
+.atmos-day .card, .atmos-day .astro-panel { --bg-card: rgba(0,0,0,0.3); }
 .atmos-day .current-details span { background: rgba(0,0,0,0.3); }
 .atmos-day .hour-chip { background: rgba(0,0,0,0.2); }
 .atmos-day .hour-chip.now { background: rgba(0,0,0,0.35); }
-.atmos-dawn .card { --bg-card: rgba(0,0,0,0.3); }
+.atmos-dawn .card, .atmos-dawn .astro-panel { --bg-card: rgba(0,0,0,0.3); }
 .atmos-dawn .current-details span { background: rgba(0,0,0,0.3); }
-.atmos-overcast .card { --bg-card: rgba(0,0,0,0.45); }
+.atmos-overcast .card, .atmos-overcast .astro-panel { --bg-card: rgba(0,0,0,0.45); }
 /* Rain/snow keep fixed gradients */
-.atmos-rain   { background: linear-gradient(170deg, #1e293b 0%, #334155 50%, #475569 100%); }
-.atmos-snow   { background: linear-gradient(170deg, #cbd5e1 0%, #e2e8f0 50%, #f1f5f9 100%); }
-.atmos-snow .card { --bg-card: rgba(0,0,0,0.3); }
+.atmos-rain   { --atmos-bg: linear-gradient(170deg, #1e293b 0%, #334155 50%, #475569 100%); background: var(--atmos-bg); }
+.atmos-snow   { --atmos-bg: linear-gradient(170deg, #cbd5e1 0%, #e2e8f0 50%, #f1f5f9 100%); background: var(--atmos-bg); }
+.atmos-snow .card, .atmos-snow .astro-panel { --bg-card: rgba(0,0,0,0.3); }
 .atmos-snow { --text-primary: #1e293b; --text-secondary: rgba(30,41,59,0.65); --text-dim: rgba(30,41,59,0.4); }
 
 /* ── App shell ── */
@@ -189,12 +189,9 @@ body { transition: background 1.5s ease; }
   text-align: left;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  background: rgba(15,23,42,0.92);
   border: 1px solid rgba(255,255,255,0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 12px 32px -8px rgba(0,0,0,0.5);
-  color: #f1f5f9;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  color: var(--text-primary);
 }
 .astro-panel-title {
   font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
@@ -271,6 +268,14 @@ body { transition: background 1.5s ease; }
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+/* Popups (day hours, sky events): page cards get their tint by being
+   translucent over the atmosphere; a popup sits over other content, so it
+   lays the same viewport-fixed gradient under its --bg-card instead.
+   Must follow .card, which sets background with equal specificity. */
+.popup-surface {
+  background: linear-gradient(var(--bg-card), var(--bg-card)), var(--atmos-bg, none);
+  background-attachment: scroll, fixed;
 }
 .card-title {
   font-family: var(--font-display);
@@ -509,7 +514,7 @@ body { transition: background 1.5s ease; }
 
 <!-- Day hours panel -->
 <div class="day-sheet" id="daySheet">
-  <div class="card" role="dialog" aria-modal="true" aria-labelledby="daySheetTitle">
+  <div class="card popup-surface" role="dialog" aria-modal="true" aria-labelledby="daySheetTitle">
     <div class="card-title"><span id="daySheetTitle"></span><button class="day-sheet-close" id="closeDaySheet" aria-label="Close">✕</button></div>
     <div class="hourly-scroll" id="daySheetHours"></div>
   </div>
@@ -591,7 +596,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v88';
+const APP_VERSION = 'v89';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
@@ -1247,7 +1252,7 @@ function renderAstroEvent(now, location, tz) {
       <div class="astro-name">${esc(feat.name)}</div>
       <div class="astro-when">${esc(fw.day)}${fw.time ? ' ' + esc(fw.time) : ''}</div>
     </summary>
-    <div class="astro-panel"><div class="astro-panel-title">Coming up in the sky</div><ul>${rows}</ul></div>
+    <div class="astro-panel popup-surface"><div class="astro-panel-title">Coming up in the sky</div><ul>${rows}</ul></div>
   </details>`;
 }
 
@@ -1574,9 +1579,11 @@ function updateAtmosphere(weatherCode, lat, lon, temperature) {
     const bg = tempGradient(temperature, gradPeriod);
     atmos.style.background = bg;
     document.body.style.background = bg;
+    document.body.style.setProperty('--atmos-bg', bg);
   } else {
     atmos.style.background = '';
     document.body.style.background = '';
+    document.body.style.removeProperty('--atmos-bg'); // rain/snow class supplies it
   }
 }
 
@@ -2507,14 +2514,6 @@ function openDaySheet(dayIdx) {
     : d.toLocaleDateString([], { weekday: 'long' });
   // Same title format as the Today/Tomorrow cards.
   $('#daySheetTitle').innerHTML = `${esc(dayName)}<span class="card-title-date">${esc(d.toLocaleDateString([], { day: 'numeric', month: 'short' }))}</span>`;
-  // In-page cards are translucent over the atmosphere gradient, which is what
-  // gives them their colour. Over the dimmed backdrop the popup would read
-  // black, so lay the same gradient (viewport-fixed, as on the page) under it.
-  const card = $('#daySheet .card');
-  const atmosBg = getComputedStyle(document.body).backgroundImage;
-  card.style.backgroundImage = atmosBg && atmosBg !== 'none'
-    ? `linear-gradient(var(--bg-card), var(--bg-card)), ${atmosBg}` : '';
-  card.style.backgroundAttachment = 'scroll, fixed';
   const sunriseIdx = weather.hourly.time.indexOf((weather.daily.sunrise[dayIdx] || '').slice(0, 13) + ':00');
   const strip = $('#daySheetHours');
   strip.innerHTML = hourChipsHtml(weather, hours, dayIdx > 0 ? sunriseIdx : -1);
