@@ -561,8 +561,8 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v78';
-const APP_DEPLOY_DATE = '2026-09-27';
+const APP_VERSION = 'v79';
+const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
 let state = {
@@ -841,15 +841,52 @@ function earthApsisJDE(year, aphelion) {
 // Approximate annual peak dates (month, day) of the major meteor showers,
 // from the IMO calendar. Actual peaks drift by about a day year to year, so
 // these are rendered as dates only, never times.
+// The fourth field marks showers whose radiant is too far north to be seen
+// usefully from the southern hemisphere; those are skipped for south latitudes.
 const METEOR_SHOWERS = [
-  ['Quadrantids', 1, 4], ['Lyrids', 4, 22], ['Eta Aquariids', 5, 6],
-  ['Perseids', 8, 12], ['Orionids', 10, 21], ['Leonids', 11, 17], ['Geminids', 12, 14],
+  ['Quadrantids', 1, 4, 'N'], ['Lyrids', 4, 22], ['Eta Aquariids', 5, 6],
+  ['Southern Delta Aquariids', 7, 30], ['Perseids', 8, 12], ['Draconids', 10, 8, 'N'],
+  ['Southern Taurids', 10, 10], ['Orionids', 10, 21], ['Northern Taurids', 11, 12],
+  ['Leonids', 11, 17], ['Geminids', 12, 14], ['Ursids', 12, 22, 'N'],
 ];
+
+// Ch. 47 — Earth–Moon centre distance (km) at a JDE. Leading terms of
+// Table 47.A; reproduces Meeus example 47.a (368409.7 km) exactly.
+const _MOON_R_TERMS = [
+  [0,0,1,0,-20905355],[2,0,-1,0,-3699111],[2,0,0,0,-2955968],[0,0,2,0,-569925],
+  [0,1,0,0,48888],[0,0,0,2,-3149],[2,0,-2,0,246158],[2,-1,-1,0,-152138],
+  [2,0,1,0,-170733],[2,-1,0,0,-204586],[0,1,-1,0,-129620],[1,0,0,0,108743],
+  [0,1,1,0,104755],[2,0,0,-2,10321],[0,0,1,-2,79661],[4,0,-1,0,-34782],
+  [0,0,3,0,-23210],[4,0,-2,0,-21636],[2,1,-1,0,24208],[2,1,0,0,30824],
+  [1,0,-1,0,-8379],[1,1,0,0,-16675],[2,-1,1,0,-12831],[2,0,2,0,-10445],
+  [4,0,0,0,-11650],[2,0,-3,0,14403],[0,1,-2,0,-7003],[2,-1,-2,0,10056],
+  [1,0,1,0,6322],[2,-2,0,0,-9884],[0,1,2,0,5751],[2,-2,-1,0,-4950],
+  [2,0,1,-2,4130],[4,-1,-1,0,-3958],[3,0,-1,0,3258],[2,1,1,0,2616],
+  [4,-1,-2,0,-1897],[0,2,-1,0,-2117],[2,2,-1,0,2354],[4,0,1,0,-1423],
+  [0,0,4,0,-1117],[4,-1,0,0,-1571],[1,0,-2,0,-1739],[0,0,2,-2,-4421],
+  [0,2,1,0,1165],[2,0,-1,-2,8752],
+];
+function moonDistanceKm(jde) {
+  const T = (jde - 2451545) / 36525;
+  const D  = 297.8501921 + 445267.1114034*T - 0.0018819*T*T + T**3/545868 - T**4/113065000;
+  const M  = 357.5291092 + 35999.0502909*T - 0.0001536*T*T + T**3/24490000;
+  const Mp = 134.9633964 + 477198.8675055*T + 0.0087414*T*T + T**3/69699 - T**4/14712000;
+  const F  = 93.2720950 + 483202.0175233*T - 0.0036539*T*T - T**3/3526000 + T**4/863310000;
+  const E = 1 - 0.002516*T - 0.0000074*T*T;
+  let sr = 0;
+  for (const [d, m, mp, f, c] of _MOON_R_TERMS) sr += c * E**Math.abs(m) * _cos(d*D + m*M + mp*Mp + f*F);
+  return 385000.56 + sr/1000;
+}
+
+// Supermoon / micromoon thresholds (km, centre to centre). There is no
+// official definition; these are the commonly used fixed-distance cut-offs.
+const SUPERMOON_KM = 360000, MICROMOON_KM = 405000;
+
 
 // Upcoming events after `now`, soonest first. `major` marks the rarer events
 // that may pre-empt a sooner new/full moon in the header slot. `dateOnly`
 // marks events whose computed time is not precise enough to show.
-function upcomingAstroEvents(now, lat, lon) {
+function upcomingAstroEvents(now, lat, lon, tz) {
   const south = lat < 0;
   const y = now.getUTCFullYear();
   const ev = [];
@@ -864,12 +901,14 @@ function upcomingAstroEvents(now, lat, lon) {
              note: 'Earth closest to the Sun'});
     ev.push({date: jdeToDate(earthApsisJDE(yr, true)), name: 'Aphelion', icon: '🌍', major: true, dateOnly: true,
              note: 'Earth farthest from the Sun'});
-    for (const [n, m, d] of METEOR_SHOWERS) {
+    for (const [n, m, d, hemi] of METEOR_SHOWERS) {
+      if (south && hemi === 'N') continue;
       ev.push({date: new Date(Date.UTC(yr, m - 1, d, 12)), name: `${n} meteor shower`, icon: '🌠', major: true,
                dateOnly: true, note: 'Approximate peak night'});
     }
   }
   const k0 = Math.floor((y - 2000) * 12.3685) - 1;
+  const fulls = [];
   for (let k = k0; k < k0 + 28; k += 0.5) {
     const lunar = k % 1 !== 0;
     const ecl = eclipseAt(k);
@@ -880,9 +919,47 @@ function upcomingAstroEvents(now, lat, lon) {
         ? (moonAltitude(date, lat, lon) > 0 ? 'Moon above your horizon at mid-eclipse' : 'Moon below your horizon at mid-eclipse')
         : 'Visible only along part of the globe';
       ev.push({date, name: `${kind} ${lunar ? 'lunar' : 'solar'} eclipse`, icon: lunar ? '🌒' : '🌘', major: true, note});
+    } else if (lunar) {
+      const jde = moonPhaseJDE(k);
+      const e = {date: jdeToDate(jde), name: 'Full moon', icon: '🌕', major: false, km: moonDistanceKm(jde)};
+      fulls.push(e);
+      ev.push(e);
     } else {
-      ev.push({date: jdeToDate(moonPhaseJDE(k)), name: lunar ? 'Full moon' : 'New moon', icon: lunar ? '🌕' : '🌑', major: false});
+      ev.push({date: jdeToDate(moonPhaseJDE(k)), name: 'New moon', icon: '🌑', major: false});
     }
+  }
+  // Harvest Moon: the full moon nearest the local autumn equinox (September
+  // in the north, March in the south); Hunter's Moon: the one after it.
+  for (const yr of [y, y + 1]) {
+    const eq = jdeToDate(equinoxSolsticeJDE(yr, south ? 0 : 2)).getTime();
+    let best = -1;
+    fulls.forEach((f, i) => {
+      if (Math.abs(f.date - eq) < 16 * 86400000 && (best < 0 || Math.abs(f.date - eq) < Math.abs(fulls[best].date - eq))) best = i;
+    });
+    if (best >= 0) {
+      fulls[best].special = 'Harvest Moon';
+      if (fulls[best + 1]) fulls[best + 1].special = "Hunter's Moon";
+    }
+  }
+  // Blue moon: the second full moon in a calendar month (location's zone).
+  for (let i = 1; i < fulls.length; i++) {
+    if (_ymdIn(fulls[i].date, tz).slice(0, 7) === _ymdIn(fulls[i - 1].date, tz).slice(0, 7)) fulls[i].special = 'Blue moon';
+  }
+  for (const f of fulls) {
+    const notes = [];
+    if (f.special) notes.push(f.special === 'Blue moon' ? 'Second full moon this month'
+      : f.special === 'Harvest Moon' ? 'Full moon nearest the autumn equinox' : 'First full moon after the Harvest Moon');
+    if (f.km < SUPERMOON_KM) {
+      f.name = f.special ? `${f.special} (supermoon)` : 'Supermoon';
+      f.major = true;
+      notes.push(`Moon ${Math.round(f.km).toLocaleString()} km away, close and bright`);
+    } else {
+      f.name = f.special || 'Full moon';
+      if (f.special) f.major = true;
+      if (f.km > MICROMOON_KM) notes.push(`Micromoon: Moon ${Math.round(f.km).toLocaleString()} km away`);
+    }
+    if (notes.length) f.note = notes.join(' · ');
+    delete f.km; delete f.special;
   }
   return ev.filter(e => e.date > now).sort((a, b) => a.date - b.date);
 }
@@ -919,7 +996,7 @@ function astroEventWhen(ev, now, tz, long) {
   return {day, time, rel, days};
 }
 function renderAstroEvent(now, location, tz) {
-  const events = upcomingAstroEvents(now, location.lat, location.lon);
+  const events = upcomingAstroEvents(now, location.lat, location.lon, tz);
   if (!events.length) return '';
   const feat = featuredAstroEvent(events, now);
   const fw = astroEventWhen(feat, now, tz, false);
