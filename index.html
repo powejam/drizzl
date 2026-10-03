@@ -360,7 +360,7 @@ body { transition: background 1.5s ease; }
 /* ── Day hours panel (tap a 10-day row) ── */
 .day-sheet {
   position: fixed; inset: 0; z-index: 110;
-  background: rgba(0,0,0,0.35); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  background: rgba(0,0,0,0.2); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
   display: none; align-items: center; justify-content: center;
   padding: 16px;
 }
@@ -591,7 +591,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 // Build version + deploy date. Bump both, plus CACHE_NAME in sw.js, on every deploy.
-const APP_VERSION = 'v85';
+const APP_VERSION = 'v86';
 const APP_DEPLOY_DATE = '2026-10-03';
 
 // ── State ──
